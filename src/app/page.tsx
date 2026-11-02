@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { TaskShowcase } from "@/components/preview/TaskShowcase";
 
 export default function HomePage() {
@@ -6,11 +7,9 @@ export default function HomePage() {
     <main className="min-h-screen bg-surface text-ink">
       <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <section className="min-w-0 flex-1 p-5 lg:p-8" id="logbook">
-          <header className="flex items-center justify-between gap-4">
-            <div><p className="text-sm font-semibold text-brand">Log Book</p><h1 className="mt-1 text-2xl font-bold tracking-tight">Komponen UI dasar</h1><p className="mt-2 text-sm text-slate-500">Fondasi tampilan untuk mencatat pekerjaan harian talent.</p></div>
-            <span className="hidden rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 sm:inline-flex">Preparation · C1 &amp; C2</span>
-          </header>
+        <section className="min-w-0 flex-1" id="logbook">
+          <AppHeader />
+          <div className="mx-5 mt-6 flex items-center gap-4 lg:mx-8"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-lg font-bold text-brand">LB</div><div><h2 className="text-xl font-bold tracking-tight">Log Book</h2><p className="mt-1 text-sm text-slate-600">Catat pekerjaan harianmu selama bekerja.</p></div></div>
           <TaskShowcase />
         </section>
       </div>

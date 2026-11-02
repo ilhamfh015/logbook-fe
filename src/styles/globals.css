@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand: #0A6FD6;
+  --color-ink: #1F2633;
+  --color-surface: #F5F7FA;
+}
+
 :root {
   color: #1F2633;
   background: #F5F7FA;
@@ -16,4 +22,10 @@ body {
 
 button {
   font: inherit;
+}
+
+@layer components {
+  .field-control {
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-[#1F2633] outline-none transition placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-blue-100;
+  }
 }
