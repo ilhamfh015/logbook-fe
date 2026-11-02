@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ProjectChip } from "@/components/shared/ProjectChip";
 import { StatusSegmented } from "@/components/shared/StatusSegmented";
 import { TaskTypePill } from "@/components/shared/TaskTypePill";
 import { taskTypes } from "@/lib/taskOptions";
-import type { TaskDraft, TaskType, WorkStatus } from "@/types/task";
+import type { ProjectColor, TaskDraft, TaskType, WorkStatus } from "@/types/task";
 
-type TaskFormProps = { onCancel: () => void; onSave: (task: TaskDraft) => void };
+type TaskFormProps = { onCancel: () => void; onSave: (task: TaskDraft) => void; initialTask?: TaskDraft | null };
 
 const projects = [
   { name: "Bank XYZ - Mobile Banking", color: "blue" as const },
@@ -16,15 +16,32 @@ const projects = [
   { name: "Internal Padepokan", color: "blue" as const },
 ];
 
-export function TaskForm({ onCancel, onSave }: TaskFormProps) {
+export function TaskForm({ onCancel, onSave, initialTask }: TaskFormProps) {
   const [project, setProject] = useState(projects[0].name);
   const [projectOtherOpen, setProjectOtherOpen] = useState(false);
   const [projectOther, setProjectOther] = useState("");
+  const [projectOtherColor, setProjectOtherColor] = useState<ProjectColor>("blue");
   const [type, setType] = useState<TaskType>("Pengembangan");
   const [status, setStatus] = useState<WorkStatus>("BERJALAN");
   const [duration, setDuration] = useState("60");
   const [customDuration, setCustomDuration] = useState("30");
   const [summary, setSummary] = useState("");
+
+  useEffect(() => {
+    if (!initialTask) return;
+    window.queueMicrotask(() => {
+      const preset = projects.find((item) => item.name === initialTask.project);
+      setProject(preset ? initialTask.project : "");
+      setProjectOtherOpen(!preset);
+      setProjectOther(preset ? "" : initialTask.project);
+      setProjectOtherColor(initialTask.projectColor);
+      setType(initialTask.type);
+      setStatus(initialTask.workStatus);
+      setDuration(["15", "30", "60", "90", "120"].includes(String(initialTask.durationMinutes)) ? String(initialTask.durationMinutes) : "other");
+      setCustomDuration(String(initialTask.durationMinutes));
+      setSummary(initialTask.summary);
+    });
+  }, [initialTask]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -36,6 +53,8 @@ export function TaskForm({ onCancel, onSave }: TaskFormProps) {
 
     onSave({
       project: finalProject,
+      id: initialTask?.id,
+      projectColor: projectOtherOpen ? projectOtherColor : projects.find((item) => item.name === project)?.color ?? "blue",
       ticket: String(formData.get("ticket") ?? "").trim(),
       startTime: String(formData.get("startTime") ?? "16:00"),
       durationMinutes,
@@ -53,12 +72,12 @@ export function TaskForm({ onCancel, onSave }: TaskFormProps) {
           {projects.map((item) => <ProjectChip key={item.name} name={item.name} color={item.color} selected={!projectOtherOpen && project === item.name} onClick={() => { setProject(item.name); setProjectOtherOpen(false); }} />)}
           <button type="button" aria-pressed={projectOtherOpen} onClick={() => { setProjectOtherOpen(true); setProject(""); }} className={`rounded-full border border-dashed px-3 py-1.5 text-xs font-medium transition ${projectOtherOpen ? "border-brand bg-blue-50 text-brand" : "border-slate-300 text-slate-600 hover:border-brand hover:text-brand"}`}>+ Proyek lain</button>
         </div>
-        {projectOtherOpen ? <input autoFocus required name="projectOther" value={projectOther} onChange={(event) => setProjectOther(event.target.value)} className="field-control mt-3" placeholder="Nama proyek" aria-label="Nama proyek baru" /> : null}
+        {projectOtherOpen ? <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]"><input autoFocus required name="projectOther" value={projectOther} onChange={(event) => setProjectOther(event.target.value)} className="field-control" placeholder="Nama proyek" aria-label="Nama proyek baru" /><label className="flex items-center gap-2 text-sm font-medium text-slate-600"><span>Warna</span><input type="color" value={projectOtherColor.startsWith("#") ? projectOtherColor : "#2563eb"} onChange={(event) => setProjectOtherColor(event.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border border-slate-200 bg-white p-1" aria-label="Pilih warna proyek" /></label></div> : null}
       </fieldset>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-        <label className="col-span-2 sm:col-span-1"><span className="mb-2 block text-sm font-semibold">Tiket <span className="font-normal text-slate-400">(opsional)</span></span><input name="ticket" className="field-control" placeholder="ABC-153" /></label>
-        <label><span className="mb-2 block text-sm font-semibold">Mulai <span className="text-brand">*</span></span><input name="startTime" className="field-control" type="time" defaultValue="16:00" required /></label>
+        <label className="col-span-2 sm:col-span-1"><span className="mb-2 block text-sm font-semibold">Tiket <span className="font-normal text-slate-400">(opsional)</span></span><input name="ticket" className="field-control" placeholder="ABC-153" defaultValue={initialTask?.ticket} /></label>
+        <label><span className="mb-2 block text-sm font-semibold">Mulai <span className="text-brand">*</span></span><input name="startTime" className="field-control" type="time" defaultValue={initialTask?.startTime ?? "16:00"} required /></label>
         <label><span className="mb-2 block text-sm font-semibold">Durasi <span className="text-brand">*</span></span><select name="duration" className="field-control" value={duration} onChange={(event) => setDuration(event.target.value)}><option value="15">15 m</option><option value="30">30 m</option><option value="60">1 j</option><option value="90">1,5 j</option><option value="120">2 j</option><option value="other">Lainnya</option></select></label>
       </div>
       {duration === "other" ? <label className="block"><span className="mb-2 block text-sm font-semibold">Durasi (menit)</span><input className="field-control max-w-40" type="number" min="5" step="5" value={customDuration} onChange={(event) => setCustomDuration(event.target.value)} required /></label> : null}

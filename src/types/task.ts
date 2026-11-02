@@ -1,9 +1,12 @@
-export type ProjectColor = "blue" | "orange";
+export type ProjectColor = string;
 export type WorkStatus = "SELESAI" | "BERJALAN" | "TERTAHAN";
 export type TaskType = "Pengembangan" | "Perbaikan bug" | "Rapat" | "Review" | "Belajar" | "Istirahat" | "Lainnya";
 
 export type TaskDraft = {
+  id?: string;
+  deletedAt?: string;
   project: string;
+  projectColor: ProjectColor;
   ticket: string;
   startTime: string;
   durationMinutes: number;
