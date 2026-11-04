@@ -1,9 +1,11 @@
+
 export type ProjectColor = string;
 export type WorkStatus = "SELESAI" | "BERJALAN" | "TERTAHAN";
 export type TaskType = "Pengembangan" | "Perbaikan bug" | "Rapat" | "Review" | "Belajar" | "Istirahat" | "Lainnya";
 
 export type TaskDraft = {
   id?: string;
+  date?: string;
   deletedAt?: string;
   project: string;
   projectColor: ProjectColor;

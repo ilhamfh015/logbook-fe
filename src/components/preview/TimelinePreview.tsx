@@ -1,8 +1,19 @@
-import { ChevronLeft, ChevronRight, Coffee, Folder, Home, Info, Play, Plus } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Coffee,
+  Folder,
+  Home,
+  Info,
+  Plus,
+} from "lucide-react";
 import { ProjectChip } from "@/components/shared/ProjectChip";
 import type { ProjectColor, TaskDraft } from "@/types/task";
 
-const hourLabels = Array.from({ length: 10 }, (_, index) => `${String(index + 8).padStart(2, "0")}.00`);
+const hourLabels = Array.from(
+  { length: 10 },
+  (_, index) => `${String(index + 8).padStart(2, "0")}.00`,
+);
 
 type TimelineTask = {
   id: string;
@@ -12,31 +23,101 @@ type TimelineTask = {
   tone: ProjectColor;
   startSlot: number;
   durationSlots: number;
-  column: "full" | "left" | "right";
+  column: "full" | "left" | "middle" | "right";
   badge?: string;
   sourceTask?: TaskDraft;
   persisted?: boolean;
 };
 
 const tasks: TimelineTask[] = [
-  { id: "abc-151", project: "BANK XYZ", title: "Pengembangan · ABC-151 · 2 j", description: "Paginasi riwayat transaksi selesai, menunggu review.", tone: "blue", startSlot: 1, durationSlots: 4, column: "full" },
-  { id: "inc-88", project: "ASURANSI ABC", title: "Perbaikan bug · INC-88 · 2 j", description: "Laporan klaim gagal diekspor ke PDF. Penyebab: font tidak tertanam. Diperbaiki di staging.", tone: "orange", startSlot: 5, durationSlots: 4, column: "full" },
-  { id: "abc-153", project: "BANK XYZ", title: "Pengembangan · ABC-153 · 3 j", description: "Form transfer antarbank: validasi nominal dan rekening tujuan. Sebagian besar selesai, sisa pesan galat.", tone: "blue", startSlot: 11, durationSlots: 6, column: "left", badge: "Berjalan" },
-  { id: "support", project: "ASURANSI ABC", title: "Lainnya · Siaga support · 1,5 j", description: "Siaga rilis; 1 pertanyaan user dijawab.", tone: "orange", startSlot: 11, durationSlots: 3, column: "right" },
+  {
+    id: "abc-151",
+    project: "BANK XYZ",
+    title: "Pengembangan · ABC-151 · 2 j",
+    description: "Paginasi riwayat transaksi selesai, menunggu review.",
+    tone: "blue",
+    startSlot: 1,
+    durationSlots: 4,
+    column: "full",
+  },
+  {
+    id: "inc-88",
+    project: "ASURANSI ABC",
+    title: "Perbaikan bug · INC-88 · 2 j",
+    description:
+      "Laporan klaim gagal diekspor ke PDF. Penyebab: font tidak tertanam. Diperbaiki di staging.",
+    tone: "orange",
+    startSlot: 5,
+    durationSlots: 4,
+    column: "full",
+  },
+  {
+    id: "abc-153",
+    project: "BANK XYZ",
+    title: "Pengembangan · ABC-153 · 3 j",
+    description:
+      "Form transfer antarbank: validasi nominal dan rekening tujuan. Sebagian besar selesai, sisa pesan galat.",
+    tone: "blue",
+    startSlot: 11,
+    durationSlots: 6,
+    column: "left",
+    badge: "Berjalan",
+  },
+  {
+    id: "support",
+    project: "ASURANSI ABC",
+    title: "Lainnya · Siaga support · 1,5 j",
+    description: "Siaga rilis; 1 pertanyaan user dijawab.",
+    tone: "orange",
+    startSlot: 11,
+    durationSlots: 3,
+    column: "right",
+  },
 ];
 
-type TimelinePreviewProps = { date: Date; onChangeDate: (date: Date) => void; onAddTask: () => void; savedTasks: TaskDraft[]; onEditTask: (task: TaskDraft) => void; onDeleteTask: (id: string) => void };
+type TimelinePreviewProps = {
+  date: Date;
+  onChangeDate: (date: Date) => void;
+  onAddTask: (startTime?: string) => void;
+  savedTasks: TaskDraft[];
+  onEditTask: (task: TaskDraft) => void;
+  onDeleteTask: (id: string) => void;
+};
 
-export function TimelinePreview({ date, onChangeDate, onAddTask, savedTasks, onEditTask, onDeleteTask }: TimelinePreviewProps) {
-  const activeSavedTasks = savedTasks.filter((task) => !task.deletedAt);
-  const formattedDate = new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "2-digit", month: "short", year: "numeric" }).format(date);
+export function TimelinePreview({
+  date,
+  onChangeDate,
+  onAddTask,
+  savedTasks,
+  onEditTask,
+  onDeleteTask,
+}: TimelinePreviewProps) {
+  const dateKey = (value: Date) => {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const selectedDateKey = dateKey(date);
+
+  const activeSavedTasks = savedTasks.filter(
+    (task) => !task.deletedAt && task.date === selectedDateKey,
+  );
+  const formattedDate = new Intl.DateTimeFormat("id-ID", {
+    weekday: "long",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
   const moveDate = (days: number) => {
     const nextDate = new Date(date);
     nextDate.setDate(nextDate.getDate() + days);
     onChangeDate(nextDate);
   };
   const dayTasks: TimelineTask[] = [
-    ...tasks.map((task) => ({
+    ...(selectedDateKey === "2026-10-29" ? tasks : []).map((task) => ({
       ...task,
       sourceTask: {
         id: `demo-${task.id}`,
@@ -47,7 +128,10 @@ export function TimelinePreview({ date, onChangeDate, onAddTask, savedTasks, onE
         durationMinutes: task.durationSlots * 30,
         type: task.title.split(" · ")[0] as TaskDraft["type"],
         summary: task.description,
-        workStatus: task.badge === "Berjalan" ? "BERJALAN" as const : "SELESAI" as const,
+        workStatus:
+          task.badge === "Berjalan"
+            ? ("BERJALAN" as const)
+            : ("SELESAI" as const),
       },
       persisted: false,
     })),
@@ -60,40 +144,279 @@ export function TimelinePreview({ date, onChangeDate, onAddTask, savedTasks, onE
       startSlot: timeToSlot(task.startTime),
       durationSlots: Math.max(1, Math.ceil(task.durationMinutes / 30)),
       column: "full" as const,
-      badge: task.workStatus === "BERJALAN" ? "Berjalan" : task.workStatus === "TERTAHAN" ? "Tertahan" : undefined,
+      badge:
+        task.workStatus === "BERJALAN"
+          ? "Berjalan"
+          : task.workStatus === "TERTAHAN"
+            ? "Tertahan"
+            : task.workStatus === "SELESAI"
+              ? "Selesai"
+              : undefined,
       sourceTask: task,
       persisted: true,
     })),
   ];
 
+  const positionedTasks: TimelineTask[] = [];
+
+  const sortedTasks = [...dayTasks].sort((a, b) => a.startSlot - b.startSlot);
+
+  for (const task of sortedTasks) {
+    const hasOverlap = dayTasks.some(
+      (other) =>
+        other.id !== task.id &&
+        task.startSlot < other.startSlot + other.durationSlots &&
+        other.startSlot < task.startSlot + task.durationSlots,
+    );
+
+    if (!hasOverlap) {
+      positionedTasks.push({ ...task, column: "full" });
+      continue;
+    }
+
+    const availableColumns = ["left", "middle", "right"] as const;
+
+    const column =
+      availableColumns.find(
+        (candidate) =>
+          !positionedTasks.some(
+            (placed) =>
+              placed.column === candidate &&
+              task.startSlot < placed.startSlot + placed.durationSlots &&
+              placed.startSlot < task.startSlot + task.durationSlots,
+          ),
+      ) ?? "right";
+
+    positionedTasks.push({ ...task, column });
+  }
+
+  const projectSummaries = Object.values(
+    positionedTasks.reduce<
+      Record<
+        string,
+        {
+          name: string;
+          color: TimelineTask["tone"];
+          minutes: number;
+        }
+      >
+    >((summary, task) => {
+      if (task.sourceTask?.type === "Istirahat") return summary;
+
+      const projectName = task.project;
+
+      if (!summary[projectName]) {
+        summary[projectName] = {
+          name: projectName,
+          color: task.tone,
+          minutes: 0,
+        };
+      }
+
+      summary[projectName].minutes += task.durationSlots * 30;
+
+      return summary;
+    }, {}),
+  );
+  const totalWorkedMinutes = (() => {
+    const intervals = dayTasks
+      .filter((task) => task.sourceTask?.type !== "Istirahat")
+      .map((task) => ({
+        start: task.startSlot * 30,
+        end: (task.startSlot + task.durationSlots) * 30,
+      }))
+      .sort((a, b) => a.start - b.start);
+
+    let total = 0;
+    let currentEnd = -Infinity;
+
+    for (const interval of intervals) {
+      if (interval.end <= currentEnd) continue;
+
+      const start = Math.max(interval.start, currentEnd);
+      total += interval.end - start;
+      currentEnd = interval.end;
+    }
+
+    return total;
+  })();
+
   return (
     <section className="min-w-0 flex-1 p-4 sm:p-5 lg:p-7">
-      <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500"><Home size={16} /><span aria-hidden="true">›</span><span className="font-medium text-ink">Log Book</span><span aria-hidden="true">›</span><span className="font-semibold text-ink">{formattedDate}</span></div>
+      <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+        <Home size={16} />
+        <span aria-hidden="true">›</span>
+        <span className="font-medium text-ink">Log Book</span>
+        <span aria-hidden="true">›</span>
+        <span className="font-semibold text-ink">{formattedDate}</span>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-          <button type="button" onClick={() => moveDate(-1)} className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" aria-label="Hari sebelumnya"><ChevronLeft size={19} /></button>
-          <h1 className="text-lg font-bold tracking-tight sm:text-2xl lg:text-3xl">{formattedDate}</h1>
-          <button type="button" onClick={() => moveDate(1)} className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" aria-label="Hari berikutnya"><ChevronRight size={19} /></button>
+          <button
+            type="button"
+            onClick={() => moveDate(-1)}
+            className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label="Hari sebelumnya"
+          >
+            <ChevronLeft size={19} />
+          </button>
+          <h1 className="text-lg font-bold tracking-tight sm:text-2xl lg:text-3xl">
+            {formattedDate}
+          </h1>
+          <button
+            type="button"
+            onClick={() => moveDate(1)}
+            className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label="Hari berikutnya"
+          >
+            <ChevronRight size={19} />
+          </button>
         </div>
-        <div className="flex items-center gap-1 text-xs text-slate-500 sm:text-sm"> <span>Total</span><strong className="text-ink">7 j</strong><span className="hidden sm:inline">(paralel dihitung sekali)</span><details className="relative"><summary className="list-none cursor-pointer rounded p-1 hover:bg-blue-50" aria-label="Tentang perhitungan total jam"><Info size={15} /></summary><span className="absolute right-0 top-7 z-20 w-56 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-lg">Rentang task yang waktunya bersamaan dihitung satu kali pada total harian.</span></details></div>
+        <div className="flex items-center gap-1 text-xs text-slate-500 sm:text-sm">
+          {" "}
+          <span>Total</span>
+          <strong className="text-ink">
+            {formatDuration(totalWorkedMinutes)}
+          </strong>
+          <span className="hidden sm:inline">(paralel dihitung sekali)</span>
+          <details className="relative">
+            <summary
+              className="list-none cursor-pointer rounded p-1 hover:bg-blue-50"
+              aria-label="Tentang perhitungan total jam"
+            >
+              <Info size={15} />
+            </summary>
+            <span className="absolute right-0 top-7 z-20 w-56 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-lg">
+              Rentang task yang waktunya bersamaan dihitung satu kali pada total
+              harian.
+            </span>
+          </details>
+        </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2"><ProjectChip name="Bank XYZ" color="blue" hours="5 j" /><ProjectChip name="Asuransi ABC" color="orange" hours="3 j 30 m" /></div>
+      <div className="mt-5 flex flex-wrap gap-2">
+        {projectSummaries.map((project) => (
+          <ProjectChip
+            key={project.name}
+            name={project.name}
+            color={project.color}
+            hours={formatDuration(project.minutes)}
+          />
+        ))}
+      </div>
 
       <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-3 lg:p-4">
         <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-2 sm:grid-cols-[3.75rem_minmax(0,1fr)] sm:gap-3">
-          <div aria-hidden="true" className="grid grid-cols-1" style={{ gridTemplateRows: "repeat(18, minmax(0, 40px)) 24px" }}>{hourLabels.map((hour, index) => <div key={hour} className="pt-1 text-xs font-medium text-slate-500 sm:text-sm" style={{ gridRow: index === 9 ? 19 : index * 2 + 1 }}>{hour}</div>)}</div>
-          <div className="relative grid min-w-0 grid-cols-3 gap-x-1.5 sm:gap-x-2" style={{ gridTemplateRows: "repeat(18, minmax(0, 40px)) 24px" }}>
-            {Array.from({ length: 18 }, (_, index) => <div key={index} className="col-span-3 border-t border-slate-100" style={{ gridRow: index + 1 }} />)}
-            {dayTasks.map((task) => <TimelineBlock key={task.id} task={task} onEdit={onEditTask} />)}
-            <div className="z-10 flex items-center rounded-xl border border-dashed border-slate-300 bg-white px-3 text-sm text-slate-500" style={{ gridRow: "9 / span 2", gridColumn: "1 / -1" }}><Coffee size={18} className="mr-3 shrink-0" />Istirahat</div>
+          <div
+            aria-hidden="true"
+            className="grid grid-cols-1"
+            style={{ gridTemplateRows: "repeat(18, minmax(0, 40px)) 24px" }}
+          >
+            {hourLabels.map((hour, index) => (
+              <div
+                key={hour}
+                className="pt-1 text-xs font-medium text-slate-500 sm:text-sm"
+                style={{ gridRow: index === 9 ? 19 : index * 2 + 1 }}
+              >
+                {hour}
+              </div>
+            ))}
+          </div>
+          <div
+            className="relative grid min-w-0 grid-cols-3 gap-x-1.5 sm:gap-x-2"
+            style={{ gridTemplateRows: "repeat(18, minmax(0, 40px)) 24px" }}
+          >
+            {Array.from({ length: 18 }, (_, index) => (
+              <button
+                key={index}
+                type="button"
+                aria-label={`Tambah task pukul ${slotToInputTime(index + 1)}`}
+                onClick={() => onAddTask(slotToInputTime(index + 1))}
+                className="col-span-3 h-full cursor-pointer border-t border-slate-100 bg-transparent text-left hover:bg-blue-50/40"
+                style={{ gridRow: index + 1 }}
+              />
+            ))}
+            {positionedTasks.map((task) => (
+              <TimelineBlock key={task.id} task={task} onEdit={onEditTask} />
+            ))}
+            <div
+              className="z-10 flex items-center rounded-xl border border-dashed border-slate-300 bg-white px-3 text-sm text-slate-500"
+              style={{ gridRow: "9 / span 2", gridColumn: "1 / -1" }}
+            >
+              <Coffee size={18} className="mr-3 shrink-0" />
+              Istirahat
+            </div>
           </div>
         </div>
-        <button type="button" onClick={onAddTask} className="ml-[3.75rem] mt-3 flex h-12 w-[calc(100%-3.75rem)] items-center justify-center rounded-xl border border-dashed border-brand bg-white text-sm font-semibold text-brand transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:ml-[4.5rem] sm:w-[calc(100%-4.5rem)]"><Plus size={18} className="mr-2" />Tambah task mulai 16.00</button>
+        <button
+          type="button"
+          onClick={() => onAddTask()}
+          className="ml-[3.75rem] mt-3 flex h-12 w-[calc(100%-3.75rem)] items-center justify-center rounded-xl border border-dashed border-brand bg-white text-sm font-semibold text-brand transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:ml-[4.5rem] sm:w-[calc(100%-4.5rem)]"
+        >
+          <Plus size={18} className="mr-2" />
+          Tambah task mulai 16.00
+        </button>
       </div>
-      <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-live="polite">
-        <div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-bold">Task hari ini</h2><p className="mt-1 text-xs text-slate-500">Daftar pekerjaan yang tercatat pada tanggal ini.</p></div><span className="text-xs font-medium text-slate-500">{dayTasks.length} task</span></div>
-        <ul className="mt-3 divide-y divide-slate-100">{dayTasks.map((task) => <li key={`list-${task.id}`} className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"><div className="min-w-0"><p className="text-sm font-semibold">{task.title}</p><p className="mt-1 text-xs text-slate-500">{task.project} · {slotToTime(task.startSlot)} · {formatDuration(task.durationSlots * 30)}</p><p className="mt-1 text-sm text-slate-600">{task.description}</p></div><div className="flex items-center gap-2">{task.sourceTask ? <><button type="button" onClick={() => onEditTask(task.sourceTask!)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Edit</button>{task.persisted ? <button type="button" onClick={() => onDeleteTask(task.sourceTask!.id!)} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Hapus</button> : null}</> : <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Selesai</span>}</div></li>)}</ul>
+      <section
+        className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+        aria-live="polite"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold">Task hari ini</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Daftar pekerjaan yang tercatat pada tanggal ini.
+            </p>
+          </div>
+          <span className="text-xs font-medium text-slate-500">
+            {dayTasks.length} task
+          </span>
+        </div>
+        <ul className="mt-3 divide-y divide-slate-100">
+          {positionedTasks.map((task) => (
+            <li
+              key={`list-${task.id}`}
+              className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{task.title}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {task.project} · {slotToTime(task.startSlot)} ·{" "}
+                  {formatDuration(task.durationSlots * 30)}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {task.description}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {task.sourceTask ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onEditTask(task.sourceTask!)}
+                      className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      Edit
+                    </button>
+                    {task.persisted ? (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteTask(task.sourceTask!.id!)}
+                        className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                      >
+                        Hapus
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                    Selesai
+                  </span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
     </section>
   );
@@ -102,7 +425,10 @@ export function TimelinePreview({ date, onChangeDate, onAddTask, savedTasks, onE
 function timeToSlot(value: string) {
   const [hours, minutes] = value.split(":").map(Number);
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 17;
-  return Math.min(18, Math.max(1, (hours - 8) * 2 + Math.floor(minutes / 30) + 1));
+  return Math.min(
+    18,
+    Math.max(1, (hours - 8) * 2 + Math.floor(minutes / 30) + 1),
+  );
 }
 
 function formatDuration(minutes: number) {
@@ -122,15 +448,70 @@ function slotToInputTime(slot: number) {
   return `${String(Math.floor(totalMinutes / 60)).padStart(2, "0")}:${String(totalMinutes % 60).padStart(2, "0")}`;
 }
 
-function TimelineBlock({ task, onEdit }: { task: TimelineTask; onEdit: (task: TaskDraft) => void }) {
+function TimelineBlock({
+  task,
+  onEdit,
+}: {
+  task: TimelineTask;
+  onEdit: (task: TaskDraft) => void;
+}) {
   const orange = task.tone === "orange";
-  const gridColumn = task.column === "full" ? "1 / -1" : task.column === "left" ? "1 / span 2" : "3";
+  const gridColumn =
+    task.column === "full"
+      ? "1 / -1"
+      : task.column === "left"
+        ? "1"
+        : task.column === "middle"
+          ? "2"
+          : "3";
   return (
-    <article onClick={() => task.sourceTask && onEdit(task.sourceTask)} onKeyDown={(event) => { if (task.sourceTask && (event.key === "Enter" || event.key === " ")) onEdit(task.sourceTask); }} role={task.sourceTask ? "button" : undefined} tabIndex={task.sourceTask ? 0 : undefined} className={`group z-10 min-w-0 overflow-hidden rounded-xl border p-2.5 sm:p-3 lg:p-4 ${orange ? "border-orange-200 bg-orange-50" : "border-blue-200 bg-blue-50"} ${task.sourceTask ? "cursor-pointer hover:brightness-95" : ""}`} style={{ gridRow: `${task.startSlot} / span ${task.durationSlots}`, gridColumn, ...(task.tone.startsWith("#") ? { borderColor: task.tone, backgroundColor: `${task.tone}18` } : {}) }}>
-      <span className={`inline-flex max-w-full items-center gap-2 truncate rounded-full px-2.5 py-1 text-[10px] font-bold sm:px-3 sm:text-xs ${orange ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}><Folder size={13} className="shrink-0" />{task.project}</span>
+    <article
+      onClick={() => task.sourceTask && onEdit(task.sourceTask)}
+      onKeyDown={(event) => {
+        if (task.sourceTask && (event.key === "Enter" || event.key === " "))
+          onEdit(task.sourceTask);
+      }}
+      role={task.sourceTask ? "button" : undefined}
+      tabIndex={task.sourceTask ? 0 : undefined}
+      className={`group z-10 min-w-0 overflow-hidden rounded-xl border p-2.5 sm:p-3 lg:p-4 ${orange ? "border-orange-200 bg-orange-50" : "border-blue-200 bg-blue-50"} ${task.sourceTask ? "cursor-pointer hover:brightness-95" : ""}`}
+      style={{
+        gridRow: `${task.startSlot} / span ${task.durationSlots}`,
+        gridColumn,
+        ...(task.tone.startsWith("#")
+          ? { borderColor: task.tone, backgroundColor: `${task.tone}18` }
+          : {}),
+      }}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={`inline-flex max-w-full items-center gap-2 truncate rounded-full px-2.5 py-1 text-[10px] font-bold sm:px-3 sm:text-xs ${
+            orange
+              ? "bg-orange-100 text-orange-700"
+              : "bg-blue-100 text-blue-700"
+          }`}
+        >
+          <Folder size={13} className="shrink-0" />
+          {task.project}
+        </span>
+
+        {task.badge ? (
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold sm:text-xs ${
+              task.badge === "Selesai"
+                ? "bg-green-100 text-green-700"
+                : task.badge === "Berjalan"
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-orange-100 text-orange-700"
+            }`}
+          >
+            {task.badge}
+          </span>
+        ) : null}
+      </div>
       <p className="mt-2 text-xs font-bold text-ink sm:text-sm">{task.title}</p>
-      <p className="mt-1 text-xs leading-5 text-slate-700 sm:text-sm">{task.description}</p>
-      {task.badge ? <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700"><Play size={12} />{task.badge}</span> : null}
+      <p className="mt-1 text-xs leading-5 text-slate-700 sm:text-sm">
+        {task.description}
+      </p>
     </article>
   );
 }
