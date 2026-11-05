@@ -1,3 +1,5 @@
+"use client";
+
 import {
   ChevronLeft,
   ChevronRight,
@@ -29,52 +31,6 @@ type TimelineTask = {
   persisted?: boolean;
 };
 
-const tasks: TimelineTask[] = [
-  {
-    id: "abc-151",
-    project: "BANK XYZ",
-    title: "Pengembangan · ABC-151 · 2 j",
-    description: "Paginasi riwayat transaksi selesai, menunggu review.",
-    tone: "blue",
-    startSlot: 1,
-    durationSlots: 4,
-    column: "full",
-  },
-  {
-    id: "inc-88",
-    project: "ASURANSI ABC",
-    title: "Perbaikan bug · INC-88 · 2 j",
-    description:
-      "Laporan klaim gagal diekspor ke PDF. Penyebab: font tidak tertanam. Diperbaiki di staging.",
-    tone: "orange",
-    startSlot: 5,
-    durationSlots: 4,
-    column: "full",
-  },
-  {
-    id: "abc-153",
-    project: "BANK XYZ",
-    title: "Pengembangan · ABC-153 · 3 j",
-    description:
-      "Form transfer antarbank: validasi nominal dan rekening tujuan. Sebagian besar selesai, sisa pesan galat.",
-    tone: "blue",
-    startSlot: 11,
-    durationSlots: 6,
-    column: "left",
-    badge: "Berjalan",
-  },
-  {
-    id: "support",
-    project: "ASURANSI ABC",
-    title: "Lainnya · Siaga support · 1,5 j",
-    description: "Siaga rilis; 1 pertanyaan user dijawab.",
-    tone: "orange",
-    startSlot: 11,
-    durationSlots: 3,
-    column: "right",
-  },
-];
-
 type TimelinePreviewProps = {
   date: Date;
   onChangeDate: (date: Date) => void;
@@ -82,6 +38,8 @@ type TimelinePreviewProps = {
   savedTasks: TaskDraft[];
   onEditTask: (task: TaskDraft) => void;
   onDeleteTask: (id: string) => void;
+  loading: boolean;
+  emptyMessage: string;
 };
 
 export function TimelinePreview({
@@ -91,20 +49,10 @@ export function TimelinePreview({
   savedTasks,
   onEditTask,
   onDeleteTask,
+  loading,
+  emptyMessage,
 }: TimelinePreviewProps) {
-  const dateKey = (value: Date) => {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-  };
-
-  const selectedDateKey = dateKey(date);
-
-  const activeSavedTasks = savedTasks.filter(
-    (task) => !task.deletedAt && task.date === selectedDateKey,
-  );
+  const activeSavedTasks = savedTasks.filter((task) => !task.deletedAt);
   const formattedDate = new Intl.DateTimeFormat("id-ID", {
     weekday: "long",
     day: "2-digit",
@@ -116,46 +64,26 @@ export function TimelinePreview({
     nextDate.setDate(nextDate.getDate() + days);
     onChangeDate(nextDate);
   };
-  const dayTasks: TimelineTask[] = [
-    ...(selectedDateKey === "2026-10-29" ? tasks : []).map((task) => ({
-      ...task,
-      sourceTask: {
-        id: `demo-${task.id}`,
-        project: task.project,
-        projectColor: task.tone,
-        ticket: task.title.match(/(?:ABC|INC)-\d+/)?.[0] ?? "",
-        startTime: slotToInputTime(task.startSlot),
-        durationMinutes: task.durationSlots * 30,
-        type: task.title.split(" · ")[0] as TaskDraft["type"],
-        summary: task.description,
-        workStatus:
-          task.badge === "Berjalan"
-            ? ("BERJALAN" as const)
-            : ("SELESAI" as const),
-      },
-      persisted: false,
-    })),
-    ...activeSavedTasks.map((task, index) => ({
-      id: `saved-${task.startTime}-${task.ticket}-${index}`,
-      project: task.project,
-      title: `${task.type}${task.ticket ? ` · ${task.ticket}` : ""} · ${formatDuration(task.durationMinutes)}`,
-      description: task.summary,
-      tone: task.projectColor,
-      startSlot: timeToSlot(task.startTime),
-      durationSlots: Math.max(1, Math.ceil(task.durationMinutes / 30)),
-      column: "full" as const,
-      badge:
-        task.workStatus === "BERJALAN"
-          ? "Berjalan"
-          : task.workStatus === "TERTAHAN"
-            ? "Tertahan"
-            : task.workStatus === "SELESAI"
-              ? "Selesai"
-              : undefined,
-      sourceTask: task,
-      persisted: true,
-    })),
-  ];
+  const dayTasks: TimelineTask[] = activeSavedTasks.map((task, index) => ({
+    id: task.id ?? `saved-${task.startTime}-${task.ticket}-${index}`,
+    project: task.project,
+    title: `${task.type}${task.ticket ? ` · ${task.ticket}` : ""} · ${formatDuration(task.durationMinutes)}`,
+    description: task.summary,
+    tone: task.projectColor,
+    startSlot: timeToSlot(task.startTime),
+    durationSlots: Math.max(1, Math.ceil(task.durationMinutes / 30)),
+    column: "full",
+    badge:
+      task.workStatus === "BERJALAN"
+        ? "Berjalan"
+        : task.workStatus === "TERTAHAN"
+          ? "Tertahan"
+          : task.workStatus === "SELESAI"
+            ? "Selesai"
+            : undefined,
+    sourceTask: task,
+    persisted: true,
+  }));
 
   const positionedTasks: TimelineTask[] = [];
 
@@ -213,7 +141,7 @@ export function TimelinePreview({
         };
       }
 
-      summary[projectName].minutes += task.durationSlots * 30;
+      summary[projectName].minutes += task.sourceTask?.durationMinutes ?? 0;
 
       return summary;
     }, {}),
@@ -222,8 +150,10 @@ export function TimelinePreview({
     const intervals = dayTasks
       .filter((task) => task.sourceTask?.type !== "Istirahat")
       .map((task) => ({
-        start: task.startSlot * 30,
-        end: (task.startSlot + task.durationSlots) * 30,
+        start: timeToMinutes(task.sourceTask!.startTime),
+        end:
+          timeToMinutes(task.sourceTask!.startTime) +
+          task.sourceTask!.durationMinutes,
       }))
       .sort((a, b) => a.start - b.start);
 
@@ -293,6 +223,13 @@ export function TimelinePreview({
           </details>
         </div>
       </div>
+
+      {emptyMessage ? (
+        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status">
+          {emptyMessage}
+        </p>
+      ) : null}
+      {loading ? <p className="mt-4 text-sm text-slate-500" role="status">Memuat task...</p> : null}
 
       <div className="mt-5 flex flex-wrap gap-2">
         {projectSummaries.map((project) => (
@@ -373,6 +310,9 @@ export function TimelinePreview({
           </span>
         </div>
         <ul className="mt-3 divide-y divide-slate-100">
+          {dayTasks.length === 0 && !loading ? (
+            <li className="py-3 text-sm text-slate-500">Belum ada task pada tanggal ini.</li>
+          ) : null}
           {positionedTasks.map((task) => (
             <li
               key={`list-${task.id}`}
@@ -381,8 +321,8 @@ export function TimelinePreview({
               <div className="min-w-0">
                 <p className="text-sm font-semibold">{task.title}</p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {task.project} · {slotToTime(task.startSlot)} ·{" "}
-                  {formatDuration(task.durationSlots * 30)}
+                  {task.project} · {task.sourceTask?.startTime ?? slotToTime(task.startSlot)} ·{" "}
+                  {formatDuration(task.sourceTask?.durationMinutes ?? task.durationSlots * 30)}
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
                   {task.description}
@@ -429,6 +369,13 @@ function timeToSlot(value: string) {
     18,
     Math.max(1, (hours - 8) * 2 + Math.floor(minutes / 30) + 1),
   );
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return Number.isFinite(hours) && Number.isFinite(minutes)
+    ? hours * 60 + minutes
+    : 0;
 }
 
 function formatDuration(minutes: number) {
