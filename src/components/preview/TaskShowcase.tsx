@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TimelinePreview } from "@/components/preview/TimelinePreview";
+import { Dialog } from "@/components/shared/Dialog";
 import { SidePanel } from "@/components/shared/SidePanel";
 import { TaskForm, type TaskFormField } from "@/components/task/TaskForm";
 import { ApiError } from "@/services/apiClient";
@@ -15,6 +16,19 @@ import type { TaskDraft as TaskFormDraft, WorkStatus } from "@/types/task";
 
 const initialMasterData: TaskMasterData = { types: [], statuses: [], durations: [] };
 
+type ConfirmDialogState = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  tone?: "default" | "danger";
+  onConfirm: () => void;
+};
+
+type AlertDialogState = {
+  title: string;
+  message: string;
+};
+
 export function TaskShowcase() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -22,8 +36,12 @@ export function TaskShowcase() {
   const [savedTasks, setSavedTasks] = useState<TaskFormDraft[]>([]);
   const [editingTask, setEditingTask] = useState<TaskFormDraft | null>(null);
   const [dailyLogId, setDailyLogId] = useState<number | null>(null);
+  const [dailyLogStatus, setDailyLogStatus] = useState<string | null>(null);
+  const [dailyLogSubmittedAt, setDailyLogSubmittedAt] = useState<string | null>(null);
   const [dailyLogMissing, setDailyLogMissing] = useState(false);
   const [dailyLogLoading, setDailyLogLoading] = useState(true);
+  const [submittingDailyLog, setSubmittingDailyLog] = useState(false);
+  const [withdrawingDailyLog, setWithdrawingDailyLog] = useState(false);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [masterData, setMasterData] = useState(initialMasterData);
   const [lookupLoading, setLookupLoading] = useState(true);
@@ -33,23 +51,34 @@ export function TaskShowcase() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [noticeIsError, setNoticeIsError] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [alertDialog, setAlertDialog] = useState<AlertDialogState | null>(null);
   const requestId = useRef(0);
+  const readOnly = dailyLogStatus === "TERKIRIM";
+  const closeConfirmDialog = useCallback(() => setConfirmDialog(null), []);
+  const closeAlertDialog = useCallback(() => setAlertDialog(null), []);
 
   const loadDailyLog = useCallback(async () => {
     const currentRequestId = ++requestId.current;
     setDailyLogLoading(true);
     setDailyLogMissing(false);
     setDailyLogId(null);
+    setDailyLogStatus(null);
+    setDailyLogSubmittedAt(null);
     setSavedTasks([]);
     try {
       const dailyLog = await taskService.getDailyLog(formatDate(selectedDate));
       if (currentRequestId !== requestId.current) return false;
       setDailyLogId(dailyLog.id);
+      setDailyLogStatus(dailyLog.status);
+      setDailyLogSubmittedAt(dailyLog.submittedAt);
       setSavedTasks(dailyLog.tasks.map((task) => toTaskDraft(task, projects, masterData)));
       return true;
     } catch (error) {
       if (currentRequestId !== requestId.current) return false;
       setDailyLogId(null);
+      setDailyLogStatus(null);
+      setDailyLogSubmittedAt(null);
       setSavedTasks([]);
       if (error instanceof ApiError && error.status === 404) {
         setDailyLogMissing(true);
@@ -109,6 +138,12 @@ export function TaskShowcase() {
     setEditingTask(null);
     setStartTime(time);
 
+    if (readOnly) {
+      setNotice("Tarik kembali Daily Log terlebih dahulu untuk mengubahnya.");
+      setNoticeIsError(false);
+      return;
+    }
+
     if (dailyLogId === null && dailyLogLoading) {
       setNotice("Daily Log sedang dimuat. Coba lagi sebentar.");
       return;
@@ -125,6 +160,8 @@ export function TaskShowcase() {
       try {
         const dailyLog = await taskService.createDailyLog(formatDate(selectedDate));
         setDailyLogId(dailyLog.id);
+        setDailyLogStatus(dailyLog.status);
+        setDailyLogSubmittedAt(dailyLog.submittedAt);
         setSavedTasks(dailyLog.tasks.map((task) => toTaskDraft(task, projects, masterData)));
         setDailyLogMissing(false);
       } catch (error) {
@@ -140,6 +177,11 @@ export function TaskShowcase() {
   };
 
   const saveTask = async (task: TaskFormDraft) => {
+    if (readOnly) {
+      setFormError("Tarik kembali Daily Log terlebih dahulu untuk mengubahnya.");
+      return;
+    }
+
     if (dailyLogId === null) {
       setFormError("Daily Log untuk tanggal ini belum tersedia. Task belum dapat disimpan.");
       return;
@@ -163,20 +205,21 @@ export function TaskShowcase() {
       setNoticeIsError(!refreshed);
     } catch (error) {
       const validation = getFieldErrors(error);
+      const hasFieldErrors = Object.keys(validation.fields).length > 0;
       setFieldErrors(validation.fields);
-      setFormError(validation.message);
+      setFormError(hasFieldErrors ? "" : validation.message);
+      setAlertDialog({
+        title: error instanceof ApiError && error.status === 400
+          ? "Periksa kembali data task"
+          : "Task belum dapat disimpan",
+        message: validation.message,
+      });
     } finally {
       setSaving(false);
     }
   };
 
-  const deleteTask = async (id: string) => {
-    const taskId = Number(id);
-    if (!Number.isSafeInteger(taskId)) {
-      setNotice("ID task tidak valid; task tidak dapat dihapus.");
-      setNoticeIsError(true);
-      return;
-    }
+  const performDeleteTask = async (taskId: number) => {
     try {
       await taskService.delete(taskId);
       const refreshed = await loadDailyLog();
@@ -188,6 +231,102 @@ export function TaskShowcase() {
     }
   };
 
+  const deleteTask = (id: string) => {
+    if (readOnly) {
+      setNotice("Tarik kembali Daily Log terlebih dahulu untuk mengubahnya.");
+      setNoticeIsError(false);
+      return;
+    }
+
+    const taskId = Number(id);
+    if (!Number.isSafeInteger(taskId)) {
+      setNotice("ID task tidak valid; task tidak dapat dihapus.");
+      setNoticeIsError(true);
+      return;
+    }
+
+    setConfirmDialog({
+      title: "Hapus task?",
+      description: "Task ini akan dihapus permanen dan tidak dapat dikembalikan.",
+      confirmLabel: "Hapus task",
+      tone: "danger",
+      onConfirm: () => {
+        setConfirmDialog(null);
+        void performDeleteTask(taskId);
+      },
+    });
+  };
+
+  const performSubmitDailyLog = async (id: number) => {
+    setSubmittingDailyLog(true);
+    setNotice("");
+    try {
+      const updated = await taskService.submitDailyLog(id);
+      setDailyLogStatus(updated.status);
+      setDailyLogSubmittedAt(updated.submittedAt);
+      setSavedTasks(updated.tasks.map((task) => toTaskDraft(task, projects, masterData)));
+      setNotice("Daily Log berhasil dikirim.");
+      setNoticeIsError(false);
+    } catch (error) {
+      setNotice(getErrorMessage(error));
+      setNoticeIsError(true);
+    } finally {
+      setSubmittingDailyLog(false);
+    }
+  };
+
+  const submitDailyLog = () => {
+    if (readOnly || dailyLogId === null || savedTasks.length === 0 || submittingDailyLog) {
+      return;
+    }
+
+    const id = dailyLogId;
+    setConfirmDialog({
+      title: "Kirim Daily Log?",
+      description: "Setelah dikirim, task tidak dapat diubah lagi sampai Daily Log ditarik kembali.",
+      confirmLabel: "Kirim Daily Log",
+      onConfirm: () => {
+        setConfirmDialog(null);
+        void performSubmitDailyLog(id);
+      },
+    });
+  };
+
+  const performWithdrawDailyLog = async (id: number) => {
+    setWithdrawingDailyLog(true);
+    setNotice("");
+    try {
+      const updated = await taskService.withdrawDailyLog(id);
+      setDailyLogStatus(updated.status);
+      setDailyLogSubmittedAt(updated.submittedAt);
+      setSavedTasks(updated.tasks.map((task) => toTaskDraft(task, projects, masterData)));
+      setNotice("Daily Log ditarik kembali menjadi Draf.");
+      setNoticeIsError(false);
+    } catch (error) {
+      setNotice(getErrorMessage(error));
+      setNoticeIsError(true);
+    } finally {
+      setWithdrawingDailyLog(false);
+    }
+  };
+
+  const withdrawDailyLog = () => {
+    if (!readOnly || dailyLogId === null || withdrawingDailyLog) {
+      return;
+    }
+
+    const id = dailyLogId;
+    setConfirmDialog({
+      title: "Tarik kembali Daily Log?",
+      description: "Status Daily Log akan kembali menjadi Draf dan task dapat diubah lagi.",
+      confirmLabel: "Tarik Kembali",
+      onConfirm: () => {
+        setConfirmDialog(null);
+        void performWithdrawDailyLog(id);
+      },
+    });
+  };
+
   return (
     <div className="flex min-h-[calc(100vh-64px)] min-w-0 pb-24 md:pb-0">
       <TimelinePreview
@@ -196,6 +335,7 @@ export function TaskShowcase() {
         onAddTask={(time) => openNewTask(time)}
         savedTasks={savedTasks}
         onEditTask={(task) => {
+          if (readOnly) return;
           setNotice("");
           setFormError("");
           setFieldErrors({});
@@ -204,7 +344,15 @@ export function TaskShowcase() {
         }}
         onDeleteTask={deleteTask}
         loading={dailyLogLoading}
-        emptyMessage={dailyLogMissing ? "Daily Log untuk tanggal ini belum tersedia. Pembuatan Daily Log ditangani terpisah." : ""}
+        emptyMessage={dailyLogMissing ? "Daily Log untuk tanggal ini belum tersedia." : ""}
+        status={dailyLogStatus}
+        submittedAt={dailyLogSubmittedAt}
+        readOnly={readOnly}
+        canSubmit={savedTasks.length > 0}
+        submitting={submittingDailyLog}
+        onSubmit={submitDailyLog}
+        withdrawing={withdrawingDailyLog}
+        onWithdraw={withdrawDailyLog}
       />
       <SidePanel
         title={editingTask ? "Edit Task" : "Tambah Task"}
@@ -232,6 +380,26 @@ export function TaskShowcase() {
       </SidePanel>
       {!panelOpen ? <button type="button" onClick={() => openNewTask()} className="fixed bottom-24 right-4 z-10 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 md:bottom-6 md:right-6">+ Tambah task</button> : null}
       {notice ? <div role={noticeIsError ? "alert" : "status"} className={`fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg md:bottom-6 ${noticeIsError ? "bg-red-700" : "bg-slate-900"}`}>{notice}</div> : null}
+      <Dialog
+        open={confirmDialog !== null}
+        title={confirmDialog?.title ?? ""}
+        confirmLabel={confirmDialog?.confirmLabel ?? ""}
+        cancelLabel="Batal"
+        tone={confirmDialog?.tone}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={closeConfirmDialog}
+      >
+        {confirmDialog?.description}
+      </Dialog>
+      <Dialog
+        open={alertDialog !== null}
+        title={alertDialog?.title ?? ""}
+        confirmLabel="Mengerti"
+        onConfirm={closeAlertDialog}
+        onCancel={closeAlertDialog}
+      >
+        {alertDialog?.message}
+      </Dialog>
     </div>
   );
 }
@@ -276,10 +444,28 @@ function getErrorMessage(error: unknown) {
   return "Terjadi kesalahan saat menghubungi server.";
 }
 
+const apiFieldMap: Record<string, TaskFormField> = {
+  projectId: "project",
+  taskTypeId: "type",
+  workStatusId: "status",
+  startTime: "startTime",
+  durationMinutes: "duration",
+  summary: "summary",
+  ticket: "ticket",
+};
+
 function getFieldErrors(error: unknown) {
   const message = getErrorMessage(error);
   const normalized = message.toLowerCase();
   const fields: Partial<Record<TaskFormField, string>> = {};
+
+  if (error instanceof ApiError) {
+    for (const [field, fieldMessage] of Object.entries(error.fieldErrors)) {
+      const mappedField = apiFieldMap[field];
+      if (mappedField) fields[mappedField] = fieldMessage;
+    }
+  }
+
   const map: Array<[TaskFormField, string[]]> = [
     ["project", ["project", "proyek"]],
     ["ticket", ["ticket", "tiket"]],
@@ -289,12 +475,12 @@ function getFieldErrors(error: unknown) {
     ["summary", ["summary", "ringkasan"]],
     ["status", ["work status", "status pekerjaan"]],
   ];
-  let fieldMessage = false;
   for (const [field, markers] of map) {
-    if (markers.some((marker) => normalized.includes(marker))) {
+    if (!fields[field] && markers.some((marker) => normalized.includes(marker))) {
       fields[field] = message;
-      fieldMessage = true;
     }
   }
-  return { fields, message: fieldMessage ? "" : message };
+
+  const firstFieldMessage = Object.values(fields).find(Boolean);
+  return { fields, message: firstFieldMessage ?? message };
 }

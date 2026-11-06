@@ -40,6 +40,14 @@ type TimelinePreviewProps = {
   onDeleteTask: (id: string) => void;
   loading: boolean;
   emptyMessage: string;
+  status: string | null;
+  submittedAt: string | null;
+  readOnly: boolean;
+  canSubmit: boolean;
+  submitting: boolean;
+  onSubmit: () => void;
+  withdrawing: boolean;
+  onWithdraw: () => void;
 };
 
 export function TimelinePreview({
@@ -51,6 +59,14 @@ export function TimelinePreview({
   onDeleteTask,
   loading,
   emptyMessage,
+  status,
+  submittedAt,
+  readOnly,
+  canSubmit,
+  submitting,
+  onSubmit,
+  withdrawing,
+  onWithdraw,
 }: TimelinePreviewProps) {
   const activeSavedTasks = savedTasks.filter((task) => !task.deletedAt);
   const formattedDate = new Intl.DateTimeFormat("id-ID", {
@@ -59,6 +75,12 @@ export function TimelinePreview({
     month: "short",
     year: "numeric",
   }).format(date);
+  const submittedLabel = submittedAt
+    ? new Intl.DateTimeFormat("id-ID", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(submittedAt))
+    : null;
   const moveDate = (days: number) => {
     const nextDate = new Date(date);
     nextDate.setDate(nextDate.getDate() + days);
@@ -202,27 +224,66 @@ export function TimelinePreview({
             <ChevronRight size={19} />
           </button>
         </div>
-        <div className="flex items-center gap-1 text-xs text-slate-500 sm:text-sm">
-          {" "}
-          <span>Total</span>
-          <strong className="text-ink">
-            {formatDuration(totalWorkedMinutes)}
-          </strong>
-          <span className="hidden sm:inline">(paralel dihitung sekali)</span>
-          <details className="relative">
-            <summary
-              className="list-none cursor-pointer rounded p-1 hover:bg-blue-50"
-              aria-label="Tentang perhitungan total jam"
+        <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500 sm:text-sm">
+          {status ? (
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                readOnly
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
             >
-              <Info size={15} />
-            </summary>
-            <span className="absolute right-0 top-7 z-20 w-56 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-lg">
-              Rentang task yang waktunya bersamaan dihitung satu kali pada total
-              harian.
+              {readOnly ? "Terkirim" : "Draf"}
             </span>
-          </details>
+          ) : null}
+          {status === "DRAF" ? (
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={!canSubmit || submitting}
+              title={canSubmit ? undefined : "Tambahkan minimal satu task sebelum mengirim."}
+              className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              {submitting ? "Mengirim..." : "Kirim Daily Log"}
+            </button>
+          ) : null}
+          <div className="flex items-center gap-1">
+            <span>Total</span>
+            <strong className="text-ink">
+              {formatDuration(totalWorkedMinutes)}
+            </strong>
+            <span className="hidden sm:inline">(paralel dihitung sekali)</span>
+            <details className="relative">
+              <summary
+                className="list-none cursor-pointer rounded p-1 hover:bg-blue-50"
+                aria-label="Tentang perhitungan total jam"
+              >
+                <Info size={15} />
+              </summary>
+              <span className="absolute right-0 top-7 z-20 w-56 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-lg">
+                Rentang task yang waktunya bersamaan dihitung satu kali pada total
+                harian.
+              </span>
+            </details>
+          </div>
         </div>
       </div>
+
+      {readOnly ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">
+          <span>
+            Daily Log sudah dikirim{submittedLabel ? ` pada ${submittedLabel}` : ""}. Tarik kembali jika perlu diperbarui.
+          </span>
+          <button
+            type="button"
+            onClick={onWithdraw}
+            disabled={withdrawing}
+            className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+          >
+            {withdrawing ? "Menarik..." : "Tarik Kembali"}
+          </button>
+        </div>
+      ) : null}
 
       {emptyMessage ? (
         <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status">
@@ -269,12 +330,20 @@ export function TimelinePreview({
                 type="button"
                 aria-label={`Tambah task pukul ${slotToInputTime(index + 1)}`}
                 onClick={() => onAddTask(slotToInputTime(index + 1))}
-                className="col-span-3 h-full cursor-pointer border-t border-slate-100 bg-transparent text-left hover:bg-blue-50/40"
+                disabled={readOnly}
+                className={`col-span-3 h-full border-t border-slate-100 bg-transparent text-left ${
+                  readOnly ? "cursor-not-allowed" : "cursor-pointer hover:bg-blue-50/40"
+                }`}
                 style={{ gridRow: index + 1 }}
               />
             ))}
             {positionedTasks.map((task) => (
-              <TimelineBlock key={task.id} task={task} onEdit={onEditTask} />
+              <TimelineBlock
+                key={task.id}
+                task={task}
+                onEdit={onEditTask}
+                readOnly={readOnly}
+              />
             ))}
             <div
               className="z-10 flex items-center rounded-xl border border-dashed border-slate-300 bg-white px-3 text-sm text-slate-500"
@@ -285,14 +354,16 @@ export function TimelinePreview({
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => onAddTask()}
-          className="ml-[3.75rem] mt-3 flex h-12 w-[calc(100%-3.75rem)] items-center justify-center rounded-xl border border-dashed border-brand bg-white text-sm font-semibold text-brand transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:ml-[4.5rem] sm:w-[calc(100%-4.5rem)]"
-        >
-          <Plus size={18} className="mr-2" />
-          Tambah task mulai 16.00
-        </button>
+        {!readOnly ? (
+          <button
+            type="button"
+            onClick={() => onAddTask()}
+            className="ml-[3.75rem] mt-3 flex h-12 w-[calc(100%-3.75rem)] items-center justify-center rounded-xl border border-dashed border-brand bg-white text-sm font-semibold text-brand transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:ml-[4.5rem] sm:w-[calc(100%-4.5rem)]"
+          >
+            <Plus size={18} className="mr-2" />
+            Tambah task mulai 16.00
+          </button>
+        ) : null}
       </div>
       <section
         className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -330,24 +401,26 @@ export function TimelinePreview({
               </div>
               <div className="flex items-center gap-2">
                 {task.sourceTask ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onEditTask(task.sourceTask!)}
-                      className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                    >
-                      Edit
-                    </button>
-                    {task.persisted ? (
+                  readOnly ? null : (
+                    <>
                       <button
                         type="button"
-                        onClick={() => onDeleteTask(task.sourceTask!.id!)}
-                        className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                        onClick={() => onEditTask(task.sourceTask!)}
+                        className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                       >
-                        Hapus
+                        Edit
                       </button>
-                    ) : null}
-                  </>
+                      {task.persisted ? (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteTask(task.sourceTask!.id!)}
+                          className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                        >
+                          Hapus
+                        </button>
+                      ) : null}
+                    </>
+                  )
                 ) : (
                   <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                     Selesai
@@ -398,11 +471,14 @@ function slotToInputTime(slot: number) {
 function TimelineBlock({
   task,
   onEdit,
+  readOnly,
 }: {
   task: TimelineTask;
   onEdit: (task: TaskDraft) => void;
+  readOnly: boolean;
 }) {
   const orange = task.tone === "orange";
+  const interactive = Boolean(task.sourceTask) && !readOnly;
   const gridColumn =
     task.column === "full"
       ? "1 / -1"
@@ -413,14 +489,17 @@ function TimelineBlock({
           : "3";
   return (
     <article
-      onClick={() => task.sourceTask && onEdit(task.sourceTask)}
-      onKeyDown={(event) => {
-        if (task.sourceTask && (event.key === "Enter" || event.key === " "))
-          onEdit(task.sourceTask);
+      onClick={() => {
+        if (interactive && task.sourceTask) onEdit(task.sourceTask);
       }}
-      role={task.sourceTask ? "button" : undefined}
-      tabIndex={task.sourceTask ? 0 : undefined}
-      className={`group z-10 min-w-0 overflow-hidden rounded-xl border p-2.5 sm:p-3 lg:p-4 ${orange ? "border-orange-200 bg-orange-50" : "border-blue-200 bg-blue-50"} ${task.sourceTask ? "cursor-pointer hover:brightness-95" : ""}`}
+      onKeyDown={(event) => {
+        if (interactive && task.sourceTask && (event.key === "Enter" || event.key === " ")) {
+          onEdit(task.sourceTask);
+        }
+      }}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      className={`group z-10 min-w-0 overflow-hidden rounded-xl border p-2.5 sm:p-3 lg:p-4 ${orange ? "border-orange-200 bg-orange-50" : "border-blue-200 bg-blue-50"} ${interactive ? "cursor-pointer hover:brightness-95" : ""}`}
       style={{
         gridRow: `${task.startSlot} / span ${task.durationSlots}`,
         gridColumn,

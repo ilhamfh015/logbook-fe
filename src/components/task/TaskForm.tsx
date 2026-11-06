@@ -81,8 +81,17 @@ export function TaskForm({
     if (!selectedProject) errors.project = "Pilih proyek yang tersedia.";
     if (!selectedType) errors.type = "Pilih jenis task yang tersedia.";
     if (!selectedStatus) errors.status = "Status pekerjaan tidak tersedia dari server.";
-    if (!Number.isFinite(durationMinutes) || durationMinutes < 5) errors.duration = "Durasi minimal 5 menit.";
-    if (!selectedProject || !selectedType || !selectedStatus || !Number.isFinite(durationMinutes) || durationMinutes < 5) {
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 5 || durationMinutes > 1440) {
+      errors.duration = "Durasi harus antara 5 dan 1440 menit.";
+    }
+    if (
+      !selectedProject
+      || !selectedType
+      || !selectedStatus
+      || !Number.isFinite(durationMinutes)
+      || durationMinutes < 5
+      || durationMinutes > 1440
+    ) {
       setLocalErrors(errors);
       return;
     }
@@ -155,7 +164,7 @@ export function TaskForm({
       {selectedDuration === "other" ? (
         <label className="block">
           <span className="mb-2 block text-sm font-semibold">Durasi (menit)</span>
-          <input className="field-control max-w-40" type="number" min="5" step="5" value={customDuration} onChange={(event) => setCustomDuration(event.target.value)} required aria-invalid={Boolean(fieldErrors.duration)} />
+          <input className="field-control max-w-40" type="number" min="5" max="1440" step="5" value={customDuration} onChange={(event) => setCustomDuration(event.target.value)} required aria-invalid={Boolean(fieldErrors.duration)} />
           {showError("duration")}
         </label>
       ) : null}

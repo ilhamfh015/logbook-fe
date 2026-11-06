@@ -34,6 +34,7 @@ export type DailyLog = {
   id: number;
   logDate: string;
   status: string;
+  submittedAt: string | null;
   totalDurationMinutes: number;
   tasks: ApiTask[];
 };
@@ -59,6 +60,16 @@ export const taskService = {
 
   createDailyLog: (date: string) =>
     apiFetch<DailyLog>(`/api/daily-logs?date=${encodeURIComponent(date)}`, {
+      method: "POST",
+    }),
+
+  submitDailyLog: (dailyLogId: number) =>
+    apiFetch<DailyLog>(`/api/daily-logs/${dailyLogId}/submit`, {
+      method: "POST",
+    }),
+
+  withdrawDailyLog: (dailyLogId: number) =>
+    apiFetch<DailyLog>(`/api/daily-logs/${dailyLogId}/withdraw`, {
       method: "POST",
     }),
 

@@ -44,6 +44,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, pathname, router]);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      router.replace("/login");
+    };
+
+    window.addEventListener("logbook:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("logbook:unauthorized", handleUnauthorized);
+  }, [router]);
+
   const login = useCallback(async (email: string) => {
     const current = await authService.login(email);
     setUser(current);
