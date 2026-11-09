@@ -54,7 +54,7 @@ export function TaskShowcase() {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [alertDialog, setAlertDialog] = useState<AlertDialogState | null>(null);
   const requestId = useRef(0);
-  const readOnly = dailyLogStatus === "TERKIRIM";
+  const readOnly = dailyLogStatus === "MENUNGGU";
   const closeConfirmDialog = useCallback(() => setConfirmDialog(null), []);
   const closeAlertDialog = useCallback(() => setAlertDialog(null), []);
 

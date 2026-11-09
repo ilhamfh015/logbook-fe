@@ -233,7 +233,7 @@ export function TimelinePreview({
                   : "bg-amber-50 text-amber-700"
               }`}
             >
-              {readOnly ? "Terkirim" : "Draf"}
+              {dailyLogStatusLabel(status)}
             </span>
           ) : null}
           {status === "DRAF" ? (
@@ -272,7 +272,7 @@ export function TimelinePreview({
       {readOnly ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">
           <span>
-            Daily Log sudah dikirim{submittedLabel ? ` pada ${submittedLabel}` : ""}. Tarik kembali jika perlu diperbarui.
+            Daily Log sudah dikirim{submittedLabel ? ` pada ${submittedLabel}` : ""} dan menunggu keputusan. Tarik kembali jika perlu diperbarui.
           </span>
           <button
             type="button"
@@ -449,6 +449,20 @@ function timeToMinutes(value: string) {
   return Number.isFinite(hours) && Number.isFinite(minutes)
     ? hours * 60 + minutes
     : 0;
+}
+
+function dailyLogStatusLabel(status: string | null) {
+  const labels: Record<string, string> = {
+    DRAF: "Draf",
+    MENUNGGU: "Menunggu",
+    DISETUJUI: "Disetujui",
+    DITOLAK: "Ditolak",
+    TERLEWAT: "Terlewat",
+    PERBAIKAN_DIAJUKAN: "Perbaikan diajukan",
+    DRAF_DIBUKA_KEMBALI: "Draf dibuka kembali",
+  };
+
+  return status ? (labels[status] ?? status) : "Draf";
 }
 
 function formatDuration(minutes: number) {

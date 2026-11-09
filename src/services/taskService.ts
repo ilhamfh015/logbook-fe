@@ -35,6 +35,10 @@ export type DailyLog = {
   logDate: string;
   status: string;
   submittedAt: string | null;
+  rejectionReason: string | null;
+  decidedByUserId: number | null;
+  decidedAt: string | null;
+  autoSubmitted: boolean;
   totalDurationMinutes: number;
   tasks: ApiTask[];
 };
