@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ProjectChip } from "@/components/shared/ProjectChip";
 import { StatusSegmented } from "@/components/shared/StatusSegmented";
 import { TaskTypePill } from "@/components/shared/TaskTypePill";
+import { logger } from "@/lib/logger";
 import type {
   DurationOption,
   ProjectOption,
@@ -186,7 +187,7 @@ export function TaskForm({
           <span className="absolute bottom-2 right-3 text-xs text-slate-400">{summary.length}/500</span>
         </div>
         {showError("summary")}
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold text-slate-600">Tulis: apa · hasil · bukti</span><Link href="/contoh" className="font-medium text-brand underline-offset-2 hover:underline">Lihat contoh</Link></div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold text-slate-600">Tulis: apa · hasil · bukti</span><Link href="/contoh" onClick={() => logger.info("Membuka contoh log book", { source: "form-task" })} className="font-medium text-brand underline-offset-2 hover:underline">Lihat contoh</Link></div>
       </div>
 
       <div>
