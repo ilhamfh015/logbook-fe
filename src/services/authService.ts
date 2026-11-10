@@ -1,5 +1,5 @@
 import { apiFetch } from "@/services/apiClient";
-import type { AuthUser } from "@/types/auth";
+import type { AuthUser, UserRoles } from "@/types/auth";
 
 export const authService = {
   login: (email: string) =>
@@ -9,6 +9,8 @@ export const authService = {
     }),
 
   me: () => apiFetch<AuthUser>("/api/auth/me"),
+
+  roles: () => apiFetch<UserRoles>("/api/auth/roles"),
 
   logout: () => apiFetch<void>("/api/auth/logout", { method: "POST" }),
 };
