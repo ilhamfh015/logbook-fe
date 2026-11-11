@@ -64,7 +64,7 @@ export function TaskForm({
   const [summary, setSummary] = useState(initialTask?.summary ?? "");
   const [obstacle, setObstacle] = useState(initialTask?.obstacle ?? "");
   const [ticket, setTicket] = useState(initialTask?.ticket ?? "");
-  const [startTime, setStartTime] = useState((initialTask?.startTime ?? initialStartTime ?? "16:00").slice(0, 5));
+  const [startTime, setStartTime] = useState((initialTask?.startTime ?? initialStartTime ?? "08:00").slice(0, 5));
   const selectedProjectId = projectId || (initialTask?.projectId ? String(initialTask.projectId) : "");
   const selectedTypeId = typeId || (initialTask?.taskTypeId ? String(initialTask.taskTypeId) : String(taskTypes[0]?.id ?? ""));
   const selectedDuration = duration ?? (
@@ -119,6 +119,9 @@ export function TaskForm({
       || durationMinutes < 5
       || durationMinutes > 1440
     ) {
+      logger.warn("Validasi form task gagal", {
+        fields: Object.keys(errors).join(",") || "task",
+      });
       for (const field of Object.keys(errors) as TaskFormField[]) notifyFieldChange(field);
       return;
     }

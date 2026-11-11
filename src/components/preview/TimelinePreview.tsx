@@ -10,6 +10,7 @@ import {
   Plus,
 } from "lucide-react";
 import { ProjectChip } from "@/components/shared/ProjectChip";
+import { nextStartTime } from "@/lib/taskTime";
 import type { ProjectColor, TaskDraft } from "@/types/task";
 
 const hourLabels = Array.from(
@@ -69,6 +70,7 @@ export function TimelinePreview({
   onWithdraw,
 }: TimelinePreviewProps) {
   const activeSavedTasks = savedTasks.filter((task) => !task.deletedAt);
+  const nextTaskStart = nextStartTime(activeSavedTasks);
   const formattedDate = new Intl.DateTimeFormat("id-ID", {
     weekday: "long",
     day: "2-digit",
@@ -357,11 +359,11 @@ export function TimelinePreview({
         {!readOnly ? (
           <button
             type="button"
-            onClick={() => onAddTask()}
+            onClick={() => onAddTask(nextTaskStart)}
             className="ml-[3.75rem] mt-3 flex h-12 w-[calc(100%-3.75rem)] items-center justify-center rounded-xl border border-dashed border-brand bg-white text-sm font-semibold text-brand transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:ml-[4.5rem] sm:w-[calc(100%-4.5rem)]"
           >
             <Plus size={18} className="mr-2" />
-            Tambah task mulai 16.00
+            Tambah task mulai {nextTaskStart.replace(":", ".")}
           </button>
         ) : null}
       </div>

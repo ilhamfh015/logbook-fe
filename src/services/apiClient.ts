@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 export class ApiError extends Error {
   readonly status: number;
   readonly fieldErrors: Record<string, string>;
@@ -11,14 +13,21 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-  });
+  const method = init?.method ?? "GET";
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...init?.headers,
+      },
+    });
+  } catch (error) {
+    logger.error("Koneksi API gagal", error, { method, path });
+    throw error;
+  }
 
   if (!response.ok) {
     if (response.status === 401 && path !== "/api/auth/login" && typeof window !== "undefined") {
@@ -45,6 +54,19 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     } catch {
       // Response tanpa body JSON; pakai pesan default.
     }
+
+    if (response.status === 404) {
+      logger.debug("Permintaan API tidak menemukan data", { method, path, status: response.status, message });
+    } else {
+      logger.warn("Permintaan API gagal", {
+        method,
+        path,
+        status: response.status,
+        message,
+        fieldCount: Object.keys(fieldErrors).length,
+      });
+    }
+
     throw new ApiError(response.status, message, fieldErrors);
   }
 
