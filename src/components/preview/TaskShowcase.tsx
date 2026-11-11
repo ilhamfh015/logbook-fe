@@ -367,6 +367,11 @@ export function TaskShowcase() {
           initialStartTime={startTime}
           onCancel={() => { setPanelOpen(false); setEditingTask(null); }}
           onSave={saveTask}
+          onFieldChange={(field) => setFieldErrors((current) => {
+            const next = { ...current };
+            delete next[field];
+            return next;
+          })}
           projects={projects}
           taskTypes={masterData.types}
           workStatuses={masterData.statuses}
