@@ -6,6 +6,8 @@ import { Dialog } from "@/components/shared/Dialog";
 import { SidePanel } from "@/components/shared/SidePanel";
 import { TaskForm, type TaskFormField } from "@/components/task/TaskForm";
 import { ApiError } from "@/services/apiClient";
+import { nextStartTime } from "@/lib/taskTime";
+import { logger } from "@/lib/logger";
 import {
   taskService,
   type DailyLog,
@@ -32,7 +34,7 @@ type AlertDialogState = {
 export function TaskShowcase() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
-  const [startTime, setStartTime] = useState("16:00");
+  const [startTime, setStartTime] = useState("08:00");
   const [savedTasks, setSavedTasks] = useState<TaskFormDraft[]>([]);
   const [editingTask, setEditingTask] = useState<TaskFormDraft | null>(null);
   const [dailyLogId, setDailyLogId] = useState<number | null>(null);
@@ -81,9 +83,11 @@ export function TaskShowcase() {
       setDailyLogSubmittedAt(null);
       setSavedTasks([]);
       if (error instanceof ApiError && error.status === 404) {
+        logger.info("Daily Log belum tersedia", { date: formatDate(selectedDate) });
         setDailyLogMissing(true);
         return false;
       }
+      logger.error("Gagal memuat Daily Log", error, { date: formatDate(selectedDate) });
       setNotice(getErrorMessage(error));
       setNoticeIsError(true);
       return false;
@@ -131,12 +135,18 @@ export function TaskShowcase() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const openNewTask = async (time = "16:00") => {
+  const openNewTask = async (time?: string) => {
     setNotice("");
     setFormError("");
     setFieldErrors({});
     setEditingTask(null);
-    setStartTime(time);
+    const suggestedStartTime = time ?? nextStartTime(savedTasks);
+    setStartTime(suggestedStartTime);
+    logger.info("Membuka form task baru", {
+      date: formatDate(selectedDate),
+      startTime: suggestedStartTime,
+      taskCount: savedTasks.length,
+    });
 
     if (readOnly) {
       setNotice("Tarik kembali Daily Log terlebih dahulu untuk mengubahnya.");
@@ -164,6 +174,7 @@ export function TaskShowcase() {
         setDailyLogSubmittedAt(dailyLog.submittedAt);
         setSavedTasks(dailyLog.tasks.map((task) => toTaskDraft(task, projects, masterData)));
         setDailyLogMissing(false);
+        logger.info("Daily Log dibuat", { date: formatDate(selectedDate), dailyLogId: dailyLog.id });
       } catch (error) {
         setNotice(getErrorMessage(error));
         setNoticeIsError(true);
@@ -177,6 +188,7 @@ export function TaskShowcase() {
   };
 
   const saveTask = async (task: TaskFormDraft) => {
+    const mode = task.id ? "update" : "create";
     if (readOnly) {
       setFormError("Tarik kembali Daily Log terlebih dahulu untuk mengubahnya.");
       return;
@@ -203,9 +215,23 @@ export function TaskShowcase() {
       const refreshed = await loadDailyLog();
       setNotice(refreshed ? (task.id ? "Task diperbarui." : "Task ditambahkan.") : "Task tersimpan, tetapi kalender belum dapat dimuat ulang.");
       setNoticeIsError(!refreshed);
+      logger.info(mode === "update" ? "Task diperbarui" : "Task ditambahkan", {
+        mode,
+        taskId: task.id ?? "-",
+        dailyLogId,
+        startTime: task.startTime,
+        durationMinutes: task.durationMinutes,
+        projectId: task.projectId ?? "-",
+      });
     } catch (error) {
       const validation = getFieldErrors(error);
       const hasFieldErrors = Object.keys(validation.fields).length > 0;
+      logger.error("Gagal menyimpan task", error, {
+        mode,
+        taskId: task.id ?? "-",
+        dailyLogId,
+        fieldCount: Object.keys(validation.fields).length,
+      });
       setFieldErrors(validation.fields);
       setFormError(hasFieldErrors ? "" : validation.message);
       setAlertDialog({
@@ -225,7 +251,9 @@ export function TaskShowcase() {
       const refreshed = await loadDailyLog();
       setNotice(refreshed ? "Task dihapus." : "Task dihapus, tetapi kalender belum dapat dimuat ulang.");
       setNoticeIsError(!refreshed);
+      logger.info("Task dihapus", { taskId });
     } catch (error) {
+      logger.error("Gagal menghapus task", error, { taskId });
       setNotice(getErrorMessage(error));
       setNoticeIsError(true);
     }
@@ -240,6 +268,7 @@ export function TaskShowcase() {
 
     const taskId = Number(id);
     if (!Number.isSafeInteger(taskId)) {
+      logger.warn("ID task tidak valid untuk dihapus", { taskId: id });
       setNotice("ID task tidak valid; task tidak dapat dihapus.");
       setNoticeIsError(true);
       return;
@@ -267,7 +296,9 @@ export function TaskShowcase() {
       setSavedTasks(updated.tasks.map((task) => toTaskDraft(task, projects, masterData)));
       setNotice("Daily Log berhasil dikirim.");
       setNoticeIsError(false);
+      logger.info("Daily Log dikirim", { dailyLogId: id, status: updated.status, taskCount: updated.tasks.length });
     } catch (error) {
+      logger.error("Gagal mengirim Daily Log", error, { dailyLogId: id });
       setNotice(getErrorMessage(error));
       setNoticeIsError(true);
     } finally {
@@ -302,7 +333,9 @@ export function TaskShowcase() {
       setSavedTasks(updated.tasks.map((task) => toTaskDraft(task, projects, masterData)));
       setNotice("Daily Log ditarik kembali menjadi Draf.");
       setNoticeIsError(false);
+      logger.info("Daily Log ditarik kembali", { dailyLogId: id, status: updated.status });
     } catch (error) {
+      logger.error("Gagal menarik kembali Daily Log", error, { dailyLogId: id });
       setNotice(getErrorMessage(error));
       setNoticeIsError(true);
     } finally {
@@ -341,6 +374,7 @@ export function TaskShowcase() {
           setFieldErrors({});
           setEditingTask(task);
           setPanelOpen(true);
+          logger.info("Membuka form edit task", { taskId: task.id ?? "-", startTime: task.startTime });
         }}
         onDeleteTask={deleteTask}
         loading={dailyLogLoading}
@@ -367,6 +401,11 @@ export function TaskShowcase() {
           initialStartTime={startTime}
           onCancel={() => { setPanelOpen(false); setEditingTask(null); }}
           onSave={saveTask}
+          onFieldChange={(field) => setFieldErrors((current) => {
+            const next = { ...current };
+            delete next[field];
+            return next;
+          })}
           projects={projects}
           taskTypes={masterData.types}
           workStatuses={masterData.statuses}

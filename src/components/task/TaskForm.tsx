@@ -18,6 +18,7 @@ export type TaskFormField = "project" | "ticket" | "startTime" | "duration" | "t
 type TaskFormProps = {
   onCancel: () => void;
   onSave: (task: TaskDraft) => Promise<void>;
+  onFieldChange?: (field: TaskFormField) => void;
   initialTask?: TaskDraft | null;
   initialStartTime?: string;
   projects: ProjectOption[];
@@ -42,6 +43,7 @@ const defaultDurations: DurationOption[] = [
 export function TaskForm({
   onCancel,
   onSave,
+  onFieldChange,
   initialTask,
   initialStartTime,
   projects,
@@ -57,46 +59,72 @@ export function TaskForm({
   const [projectId, setProjectId] = useState("");
   const [typeId, setTypeId] = useState("");
   const [status, setStatus] = useState<WorkStatus>(initialTask?.workStatus ?? "BERJALAN");
-  const [duration, setDuration] = useState("");
+  const [duration, setDuration] = useState<string | null>(null);
   const [customDuration, setCustomDuration] = useState(String(initialTask?.durationMinutes ?? 30));
   const [summary, setSummary] = useState(initialTask?.summary ?? "");
   const [obstacle, setObstacle] = useState(initialTask?.obstacle ?? "");
-  const [localErrors, setLocalErrors] = useState<Partial<Record<TaskFormField, string>>>({});
-  const selectedProjectId = projectId || (initialTask?.projectId ? String(initialTask.projectId) : String(projects[0]?.project_id ?? ""));
+  const [ticket, setTicket] = useState(initialTask?.ticket ?? "");
+  const [startTime, setStartTime] = useState((initialTask?.startTime ?? initialStartTime ?? "08:00").slice(0, 5));
+  const selectedProjectId = projectId || (initialTask?.projectId ? String(initialTask.projectId) : "");
   const selectedTypeId = typeId || (initialTask?.taskTypeId ? String(initialTask.taskTypeId) : String(taskTypes[0]?.id ?? ""));
-  const selectedDuration = duration || (
+  const selectedDuration = duration ?? (
     initialTask
       ? durations.some((item) => item.minutes === initialTask.durationMinutes) ? String(initialTask.durationMinutes) : "other"
-      : String(durations[0]?.minutes ?? 60)
+      : ""
   );
+
+  const selectedProject = projects.find((item) => String(item.project_id) === selectedProjectId);
+  const selectedType = taskTypes.find((item) => String(item.id) === selectedTypeId);
+  const selectedStatus = workStatuses.find((item) => statusForOption(item) === status);
+  const durationMinutes = selectedDuration === "other"
+    ? Number(customDuration)
+    : selectedDuration ? Number(selectedDuration) : Number.NaN;
+
+  // Dihitung dari isi form, bukan dari status submit: galat wajib sudah tampil
+  // begitu panel dibuka dan langsung hilang saat field diperbaiki.
+  const validationErrors = loading
+    ? {}
+    : validateForm({
+        projectSelected: Boolean(selectedProject),
+        typeSelected: Boolean(selectedType),
+        statusSelected: Boolean(selectedStatus),
+        ticket,
+        startTime,
+        summary,
+        durationSelection: selectedDuration,
+        customDuration,
+      });
+
+  const notifyFieldChange = (field: TaskFormField) => onFieldChange?.(field);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const selectedProject = projects.find((item) => String(item.project_id) === selectedProjectId);
-    const selectedType = taskTypes.find((item) => String(item.id) === selectedTypeId);
-    const selectedStatus = workStatuses.find((item) => statusForOption(item) === status);
-    const durationMinutes = selectedDuration === "other" ? Number(customDuration) : Number(selectedDuration);
+    const errors = validateForm({
+      projectSelected: Boolean(selectedProject),
+      typeSelected: Boolean(selectedType),
+      statusSelected: Boolean(selectedStatus),
+      ticket,
+      startTime,
+      summary,
+      durationSelection: selectedDuration,
+      customDuration,
+    });
 
-    const errors: Partial<Record<TaskFormField, string>> = {};
-    if (!selectedProject) errors.project = "Pilih proyek yang tersedia.";
-    if (!selectedType) errors.type = "Pilih jenis task yang tersedia.";
-    if (!selectedStatus) errors.status = "Status pekerjaan tidak tersedia dari server.";
-    if (!Number.isFinite(durationMinutes) || durationMinutes < 5 || durationMinutes > 1440) {
-      errors.duration = "Durasi harus antara 5 dan 1440 menit.";
-    }
     if (
       !selectedProject
       || !selectedType
       || !selectedStatus
+      || Object.keys(errors).length > 0
       || !Number.isFinite(durationMinutes)
       || durationMinutes < 5
       || durationMinutes > 1440
     ) {
-      setLocalErrors(errors);
+      logger.warn("Validasi form task gagal", {
+        fields: Object.keys(errors).join(",") || "task",
+      });
+      for (const field of Object.keys(errors) as TaskFormField[]) notifyFieldChange(field);
       return;
     }
-    setLocalErrors({});
 
     await onSave({
       id: initialTask?.id,
@@ -105,8 +133,8 @@ export function TaskForm({
       workStatusId: selectedStatus.id,
       project: selectedProject.project_name,
       projectColor: selectedProject.color || "blue",
-      ticket: String(formData.get("ticket") ?? "").trim(),
-      startTime: String(formData.get("startTime") ?? ""),
+      ticket: ticket.trim(),
+      startTime,
       durationMinutes,
       type: selectedType.name,
       summary: summary.trim(),
@@ -116,16 +144,18 @@ export function TaskForm({
   };
 
   const showError = (field: TaskFormField) => {
-    const message = fieldErrors[field] ?? localErrors[field];
+    const message = fieldErrors[field] ?? validationErrors[field];
     return message ? <p className="mt-1 text-xs font-medium text-red-600" role="alert">{message}</p> : null;
   };
+
+  const hasError = (field: TaskFormField) => Boolean(fieldErrors[field] ?? validationErrors[field]);
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit} noValidate>
       {formError ? <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{formError}</p> : null}
       {loading ? <p className="text-sm text-slate-500" role="status">Memuat pilihan task...</p> : null}
 
-      <fieldset disabled={loading || blocked || saving} className="disabled:opacity-70">
+      <fieldset disabled={loading || blocked || saving} aria-invalid={hasError("project")} className={`disabled:opacity-70 ${hasError("project") ? "rounded-lg border border-red-500 p-3" : ""}`}>
         <legend className="mb-2 text-sm font-semibold text-ink">Proyek <span className="text-brand">*</span></legend>
         <div className="flex flex-wrap gap-2">
           {projects.map((item) => (
@@ -134,7 +164,7 @@ export function TaskForm({
               name={item.project_name}
               color={projectChipColor(item)}
               selected={selectedProjectId === String(item.project_id)}
-              onClick={() => setProjectId(String(item.project_id))}
+              onClick={() => { setProjectId(String(item.project_id)); notifyFieldChange("project"); }}
             />
           ))}
         </div>
@@ -145,17 +175,18 @@ export function TaskForm({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         <label className="col-span-2 sm:col-span-1">
           <span className="mb-2 block text-sm font-semibold">Tiket <span className="font-normal text-slate-400">(opsional)</span></span>
-          <input name="ticket" className="field-control" placeholder="ABC-153" defaultValue={initialTask?.ticket} aria-invalid={Boolean(fieldErrors.ticket)} />
+          <input name="ticket" className={`field-control ${hasError("ticket") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} placeholder="ABC-153" value={ticket} aria-invalid={hasError("ticket")} onChange={(event) => { setTicket(event.currentTarget.value); notifyFieldChange("ticket"); }} />
           {showError("ticket")}
         </label>
         <label>
           <span className="mb-2 block text-sm font-semibold">Mulai <span className="text-brand">*</span></span>
-          <input name="startTime" className="field-control" type="time" defaultValue={initialTask?.startTime ?? initialStartTime ?? "16:00"} required aria-invalid={Boolean(fieldErrors.startTime)} />
+          <input name="startTime" className={`field-control ${hasError("startTime") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} type="time" value={startTime} required aria-invalid={hasError("startTime")} onChange={(event) => { setStartTime(event.currentTarget.value); notifyFieldChange("startTime"); }} />
           {showError("startTime")}
         </label>
         <label>
           <span className="mb-2 block text-sm font-semibold">Durasi <span className="text-brand">*</span></span>
-          <select name="duration" className="field-control" value={selectedDuration} onChange={(event) => setDuration(event.target.value)} aria-invalid={Boolean(fieldErrors.duration)}>
+          <select name="duration" className={`field-control ${hasError("duration") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} value={selectedDuration} onChange={(event) => { setDuration(event.target.value); notifyFieldChange("duration"); }} aria-invalid={hasError("duration")}>
+            <option value="">Pilih durasi</option>
             {(durations.length ? durations : defaultDurations).map((item) => <option key={item.minutes} value={item.minutes}>{item.label}</option>)}
             <option value="other">Lainnya</option>
           </select>
@@ -165,7 +196,7 @@ export function TaskForm({
       {selectedDuration === "other" ? (
         <label className="block">
           <span className="mb-2 block text-sm font-semibold">Durasi (menit)</span>
-          <input className="field-control max-w-40" type="number" min="5" max="1440" step="5" value={customDuration} onChange={(event) => setCustomDuration(event.target.value)} required aria-invalid={Boolean(fieldErrors.duration)} />
+          <input className={`field-control max-w-40 ${hasError("duration") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} type="number" min="5" max="1440" step="5" value={customDuration} onChange={(event) => { setCustomDuration(event.target.value); notifyFieldChange("duration"); }} required aria-invalid={hasError("duration")} />
           {showError("duration")}
         </label>
       ) : null}
@@ -174,7 +205,7 @@ export function TaskForm({
         <legend className="mb-2 text-sm font-semibold">Jenis task <span className="text-brand">*</span></legend>
         <div className="flex flex-wrap gap-2">
           {taskTypes.map((item) => (
-            <TaskTypePill key={item.id} type={item.name} selected={selectedTypeId === String(item.id)} onClick={() => setTypeId(String(item.id))} />
+            <TaskTypePill key={item.id} type={item.name} selected={selectedTypeId === String(item.id)} onClick={() => { setTypeId(String(item.id)); notifyFieldChange("type"); }} />
           ))}
         </div>
         {showError("type")}
@@ -183,7 +214,7 @@ export function TaskForm({
       <div>
         <label htmlFor="task-summary" className="mb-2 block text-sm font-semibold">Ringkasan dan hasil <span className="text-brand">*</span></label>
         <div className="relative">
-          <textarea id="task-summary" name="summary" className="field-control min-h-24 resize-y pb-7" placeholder="Apa yang dikerjakan, hasilnya, buktinya." maxLength={500} value={summary} onChange={(event) => setSummary(event.target.value)} required aria-invalid={Boolean(fieldErrors.summary)} />
+          <textarea id="task-summary" name="summary" className={`field-control min-h-24 resize-y pb-7 ${hasError("summary") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} placeholder="Apa yang dikerjakan, hasilnya, buktinya." maxLength={500} value={summary} onChange={(event) => { setSummary(event.currentTarget.value); notifyFieldChange("summary"); }} required aria-invalid={hasError("summary")} />
           <span className="absolute bottom-2 right-3 text-xs text-slate-400">{summary.length}/500</span>
         </div>
         {showError("summary")}
@@ -204,7 +235,7 @@ export function TaskForm({
 
       <fieldset disabled={loading || blocked || saving}>
         <legend className="mb-2 text-sm font-semibold">Status <span className="text-brand">*</span></legend>
-        <StatusSegmented value={status} onChange={setStatus} />
+          <StatusSegmented value={status} onChange={(value) => { setStatus(value); notifyFieldChange("status"); }} />
         {showError("status")}
       </fieldset>
       <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
@@ -226,4 +257,44 @@ function statusForOption(option: WorkStatusOption): WorkStatus | undefined {
 function projectChipColor(project: ProjectOption) {
   const projectLabel = `${project.client_name} ${project.project_name} ${project.color}`.toLowerCase();
   return projectLabel.includes("asuransi") || projectLabel.includes("orange") ? "orange" : "blue";
+}
+
+function isValidTicket(ticket: string) {
+  return /^(?:[A-Za-z][A-Za-z0-9]*-[0-9]+)?$/.test(ticket);
+}
+
+type ValidationInput = {
+  projectSelected: boolean;
+  typeSelected: boolean;
+  statusSelected: boolean;
+  ticket: string;
+  startTime: string;
+  summary: string;
+  durationSelection: string;
+  customDuration: string;
+};
+
+function validateForm(input: ValidationInput): Partial<Record<TaskFormField, string>> {
+  const errors: Partial<Record<TaskFormField, string>> = {};
+  if (!input.projectSelected) errors.project = "Proyek wajib dipilih.";
+  if (!input.typeSelected) errors.type = "Pilih jenis task yang tersedia.";
+  if (!input.statusSelected) errors.status = "Status pekerjaan tidak tersedia dari server.";
+  if (!input.summary.trim()) errors.summary = "Ringkasan wajib diisi.";
+  if (!input.startTime) errors.startTime = "Jam mulai wajib diisi.";
+  const durationError = validateDuration(input.durationSelection, input.customDuration);
+  if (durationError) errors.duration = durationError;
+  if (input.ticket.trim() && !isValidTicket(input.ticket.trim())) {
+    errors.ticket = "Format tiket tidak valid. Contoh: ABC-154";
+  }
+  return errors;
+}
+
+function validateDuration(selection: string, customDuration: string) {
+  if (!selection) return "Durasi wajib dipilih.";
+  if (selection === "other" && !customDuration.trim()) return "Durasi wajib diisi.";
+  const minutes = selection === "other" ? Number(customDuration) : Number(selection);
+  if (!Number.isFinite(minutes) || minutes < 5 || minutes > 1440) {
+    return "Durasi harus antara 5 dan 1440 menit.";
+  }
+  return undefined;
 }
