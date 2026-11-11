@@ -164,15 +164,16 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
           />
         </dl>
 
-        {log.rejectionReason || log.revisionReason ? (
+        {((log.status === "Ditolak" && log.rejectionReason)
+          || ((log.status === "Perbaikan diajukan" || log.status === "Draf dibuka kembali") && log.revisionReason)) ? (
           <section className="mt-5 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            {log.rejectionReason ? (
+            {log.status === "Ditolak" && log.rejectionReason ? (
               <div>
                 <h3 className="text-sm font-semibold text-slate-800">Alasan penolakan</h3>
                 <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-slate-600">{log.rejectionReason}</p>
               </div>
             ) : null}
-            {log.revisionReason ? (
+            {(log.status === "Perbaikan diajukan" || log.status === "Draf dibuka kembali") && log.revisionReason ? (
               <div>
                 <h3 className="text-sm font-semibold text-slate-800">Alasan perbaikan dari talent</h3>
                 <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-slate-600">{log.revisionReason}</p>

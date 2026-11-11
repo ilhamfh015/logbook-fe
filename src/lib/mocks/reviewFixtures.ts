@@ -98,11 +98,11 @@ export const reviewFixtures: ReviewDailyLog[] = [
     status: "Perbaikan diajukan",
     submittedAt: "2026-11-09T16:30:00+07:00",
     autoSubmitted: false,
-    rejectionReason: "Nomor tiket pada task kedua salah ketik, seharusnya ABC-154.",
+    rejectionReason: null,
     revisionReason: "Nomor tiket pada task kedua salah ketik, seharusnya ABC-154.",
     decidedByName: "Pak Andi",
     decidedAt: "2026-11-09T17:00:00+07:00",
-    totalDurationMinutes: 360,
+    totalDurationMinutes: 300,
     tasks: [
       {
         id: "sari-1",
@@ -121,7 +121,7 @@ export const reviewFixtures: ReviewDailyLog[] = [
         projectColor: "blue",
         ticket: "ABC-154",
         startTime: "11:00",
-        durationMinutes: 120,
+        durationMinutes: 60,
         type: "Review",
         summary: "Meninjau perubahan transaksi bersama tim.",
         workStatus: "SELESAI",

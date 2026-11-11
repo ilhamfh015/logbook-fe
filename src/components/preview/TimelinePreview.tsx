@@ -514,6 +514,13 @@ function TimelineBlock({
 }) {
   const orange = task.tone === "orange";
   const interactive = variant === "talent" && Boolean(task.sourceTask) && !readOnly;
+  const reviewTitle = [
+    task.project,
+    task.title,
+    task.badge,
+    task.description,
+    task.sourceTask?.obstacle ? `Kendala: ${task.sourceTask.obstacle}` : "",
+  ].filter(Boolean).join(" · ");
   const gridColumn =
     task.column === "full"
       ? "1 / -1"
@@ -532,6 +539,7 @@ function TimelineBlock({
           onEdit(task.sourceTask);
         }
       }}
+      title={variant === "review" ? reviewTitle : undefined}
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
       className={`group z-10 min-w-0 overflow-hidden ${variant === "review" ? "rounded-lg border p-1 sm:p-1.5" : "rounded-xl border p-2.5 sm:p-3 lg:p-4"} ${orange ? "border-orange-200 bg-orange-50" : "border-blue-200 bg-blue-50"} ${interactive ? "cursor-pointer hover:brightness-95" : ""}`}
@@ -544,21 +552,38 @@ function TimelineBlock({
       }}
     >
       {variant === "review" ? (
-        <>
-          <div className="flex min-w-0 items-center justify-between gap-1 leading-none">
-            <span className={`truncate text-[9px] font-bold ${orange ? "text-orange-700" : "text-blue-700"}`}>
-              {task.project}
-            </span>
-            {task.badge ? <span className="shrink-0 text-[9px] font-semibold text-slate-700">{task.badge}</span> : null}
-          </div>
-          <p className="mt-0.5 truncate text-[10px] font-bold leading-3 text-ink" title={task.title}>{task.title}</p>
-          <p className="mt-0.5 line-clamp-1 text-[9px] leading-3 text-slate-700" title={task.description}>{task.description}</p>
-          {task.sourceTask?.obstacle ? (
-            <p className="line-clamp-1 text-[9px] leading-3 text-slate-600" title={`Kendala: ${task.sourceTask.obstacle}`}>
-              Kendala: {task.sourceTask.obstacle}
+        <div className="min-h-0 overflow-hidden">
+          {task.durationSlots === 1 ? (
+            <p className="truncate whitespace-nowrap text-[9px] font-semibold leading-3 text-slate-800">
+              {task.project} · {task.title} · {task.badge}
             </p>
-          ) : null}
-        </>
+          ) : task.durationSlots === 2 ? (
+            <>
+              <p className={`truncate text-[9px] font-bold leading-3 ${orange ? "text-orange-700" : "text-blue-700"}`}>
+                {task.project}
+              </p>
+              <p className="mt-0.5 truncate text-[9px] font-bold leading-3 text-ink">{task.title}</p>
+              <p className="mt-0.5 line-clamp-1 text-[9px] leading-3 text-slate-700">{task.description}</p>
+              <p className="mt-0.5 truncate text-[9px] font-semibold leading-3 text-slate-700">{task.badge}</p>
+            </>
+          ) : (
+            <>
+              <div className="flex min-w-0 items-center justify-between gap-1 leading-none">
+                <span className={`truncate text-[9px] font-bold ${orange ? "text-orange-700" : "text-blue-700"}`}>
+                  {task.project}
+                </span>
+                {task.badge ? <span className="shrink-0 text-[9px] font-semibold text-slate-700">{task.badge}</span> : null}
+              </div>
+              <p className="mt-0.5 truncate text-[10px] font-bold leading-3 text-ink">{task.title}</p>
+              <p className="mt-0.5 line-clamp-1 text-[9px] leading-3 text-slate-700">{task.description}</p>
+              {task.sourceTask?.obstacle ? (
+                <p className="line-clamp-1 text-[9px] leading-3 text-slate-600">
+                  Kendala: {task.sourceTask.obstacle}
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
       ) : <>
       <div className="flex flex-wrap items-center gap-2">
         <span
