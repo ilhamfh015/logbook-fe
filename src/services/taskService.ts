@@ -39,6 +39,8 @@ export type DailyLog = {
   decidedByUserId: number | null;
   decidedAt: string | null;
   autoSubmitted: boolean;
+  editable: boolean;
+  deadline: string | null;
   totalDurationMinutes: number;
   tasks: ApiTask[];
 };

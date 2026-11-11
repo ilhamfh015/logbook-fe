@@ -44,6 +44,10 @@ type TimelinePreviewProps = {
   status: string | null;
   submittedAt: string | null;
   readOnly: boolean;
+  lockMessage: string | null;
+  deadlineLabel: string | null;
+  rejectionReason: string | null;
+  canWithdraw: boolean;
   canSubmit: boolean;
   submitting: boolean;
   onSubmit: () => void;
@@ -63,6 +67,10 @@ export function TimelinePreview({
   status,
   submittedAt,
   readOnly,
+  lockMessage,
+  deadlineLabel,
+  rejectionReason,
+  canWithdraw,
   canSubmit,
   submitting,
   onSubmit,
@@ -230,15 +238,19 @@ export function TimelinePreview({
           {status ? (
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                readOnly
+                status === "MENUNGGU"
                   ? "bg-emerald-50 text-emerald-700"
-                  : "bg-amber-50 text-amber-700"
+                  : status === "DITOLAK"
+                    ? "bg-red-50 text-red-700"
+                    : readOnly
+                      ? "bg-slate-100 text-slate-600"
+                      : "bg-amber-50 text-amber-700"
               }`}
             >
               {dailyLogStatusLabel(status)}
             </span>
           ) : null}
-          {status === "DRAF" ? (
+          {(status === "DRAF" || status === "DITOLAK") && !readOnly ? (
             <button
               type="button"
               onClick={onSubmit}
@@ -246,7 +258,11 @@ export function TimelinePreview({
               title={canSubmit ? undefined : "Tambahkan minimal satu task sebelum mengirim."}
               className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
-              {submitting ? "Mengirim..." : "Kirim Daily Log"}
+              {submitting
+                ? "Mengirim..."
+                : status === "DITOLAK"
+                  ? "Kirim Ulang"
+                  : "Kirim Daily Log"}
             </button>
           ) : null}
           <div className="flex items-center gap-1">
@@ -271,19 +287,51 @@ export function TimelinePreview({
         </div>
       </div>
 
-      {readOnly ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">
+      {status === "DITOLAK" ? (
+        <div
+          className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          role="status"
+        >
+          <p className="font-semibold">Daily Log ditolak atasan.</p>
+          {rejectionReason ? (
+            <p className="mt-1">Catatan atasan: {rejectionReason}</p>
+          ) : null}
+          <p className="mt-1 text-red-700">
+            {readOnly
+              ? "Perbaikan hanya dapat dilakukan pada tanggal hari ini."
+              : "Perbaiki task bila perlu, lalu kirim ulang pada hari ini."}
+          </p>
+        </div>
+      ) : null}
+
+      {lockMessage ? (
+        <div
+          className={`mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm ${
+            canWithdraw
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-slate-200 bg-slate-50 text-slate-700"
+          }`}
+          role="status"
+        >
           <span>
-            Daily Log sudah dikirim{submittedLabel ? ` pada ${submittedLabel}` : ""} dan menunggu keputusan. Tarik kembali jika perlu diperbarui.
+            {lockMessage}
+            {status === "MENUNGGU" && submittedLabel
+              ? ` Dikirim pada ${submittedLabel}.`
+              : null}
+            {status !== "MENUNGGU" && deadlineLabel
+              ? ` Batas pengisian ${deadlineLabel}.`
+              : null}
           </span>
-          <button
-            type="button"
-            onClick={onWithdraw}
-            disabled={withdrawing}
-            className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
-          >
-            {withdrawing ? "Menarik..." : "Tarik Kembali"}
-          </button>
+          {canWithdraw ? (
+            <button
+              type="button"
+              onClick={onWithdraw}
+              disabled={withdrawing}
+              className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+            >
+              {withdrawing ? "Menarik..." : "Tarik Kembali"}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -453,7 +501,7 @@ function timeToMinutes(value: string) {
     : 0;
 }
 
-function dailyLogStatusLabel(status: string | null) {
+export function dailyLogStatusLabel(status: string | null) {
   const labels: Record<string, string> = {
     DRAF: "Draf",
     MENUNGGU: "Menunggu",

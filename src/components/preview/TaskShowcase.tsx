@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { TimelinePreview } from "@/components/preview/TimelinePreview";
+import { TimelinePreview, dailyLogStatusLabel } from "@/components/preview/TimelinePreview";
 import { Dialog } from "@/components/shared/Dialog";
 import { SidePanel } from "@/components/shared/SidePanel";
 import { TaskForm, type TaskFormField } from "@/components/task/TaskForm";
@@ -40,6 +40,9 @@ export function TaskShowcase() {
   const [dailyLogId, setDailyLogId] = useState<number | null>(null);
   const [dailyLogStatus, setDailyLogStatus] = useState<string | null>(null);
   const [dailyLogSubmittedAt, setDailyLogSubmittedAt] = useState<string | null>(null);
+  const [dailyLogEditable, setDailyLogEditable] = useState(true);
+  const [dailyLogDeadline, setDailyLogDeadline] = useState<string | null>(null);
+  const [dailyLogRejectionReason, setDailyLogRejectionReason] = useState<string | null>(null);
   const [dailyLogMissing, setDailyLogMissing] = useState(false);
   const [dailyLogLoading, setDailyLogLoading] = useState(true);
   const [submittingDailyLog, setSubmittingDailyLog] = useState(false);
@@ -56,7 +59,29 @@ export function TaskShowcase() {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [alertDialog, setAlertDialog] = useState<AlertDialogState | null>(null);
   const requestId = useRef(0);
-  const readOnly = dailyLogStatus === "MENUNGGU";
+  const todayKey = formatDate(new Date());
+  const selectedDateKey = formatDate(selectedDate);
+  const isPastDate = selectedDateKey < todayKey;
+  const isFutureDate = selectedDateKey > todayKey;
+  // Hanya tanggal hari ini yang boleh diisi; hari yang sudah lewat maupun yang
+  // belum tiba terkunci. Server juga mengirim `editable` sebagai sumber kebenaran.
+  const readOnly = isPastDate || isFutureDate || !dailyLogEditable;
+  const canWithdraw = !isPastDate && !isFutureDate && dailyLogStatus === "MENUNGGU";
+  const lockMessage = isPastDate
+    ? "Tanggal ini sudah lewat sehingga Daily Log terkunci dan tidak dapat diubah."
+    : isFutureDate
+      ? "Task hanya dapat diisi pada tanggal hari ini. Tanggal ini belum dapat diisi."
+      : readOnly
+        ? dailyLogStatus === "MENUNGGU"
+          ? "Daily Log menunggu keputusan atasan. Tarik kembali jika perlu diperbarui."
+          : `Daily Log berstatus ${dailyLogStatusLabel(dailyLogStatus)} tidak dapat diubah.`
+        : null;
+  const deadlineLabel = dailyLogDeadline
+    ? new Intl.DateTimeFormat("id-ID", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(dailyLogDeadline))
+    : null;
   const closeConfirmDialog = useCallback(() => setConfirmDialog(null), []);
   const closeAlertDialog = useCallback(() => setAlertDialog(null), []);
 
@@ -67,6 +92,9 @@ export function TaskShowcase() {
     setDailyLogId(null);
     setDailyLogStatus(null);
     setDailyLogSubmittedAt(null);
+    setDailyLogEditable(true);
+    setDailyLogDeadline(null);
+    setDailyLogRejectionReason(null);
     setSavedTasks([]);
     try {
       const dailyLog = await taskService.getDailyLog(formatDate(selectedDate));
@@ -74,6 +102,9 @@ export function TaskShowcase() {
       setDailyLogId(dailyLog.id);
       setDailyLogStatus(dailyLog.status);
       setDailyLogSubmittedAt(dailyLog.submittedAt);
+      setDailyLogEditable(dailyLog.editable);
+      setDailyLogDeadline(dailyLog.deadline);
+      setDailyLogRejectionReason(dailyLog.rejectionReason);
       setSavedTasks(dailyLog.tasks.map((task) => toTaskDraft(task, projects, masterData)));
       return true;
     } catch (error) {
@@ -81,6 +112,9 @@ export function TaskShowcase() {
       setDailyLogId(null);
       setDailyLogStatus(null);
       setDailyLogSubmittedAt(null);
+      setDailyLogEditable(true);
+      setDailyLogDeadline(null);
+      setDailyLogRejectionReason(null);
       setSavedTasks([]);
       if (error instanceof ApiError && error.status === 404) {
         logger.info("Daily Log belum tersedia", { date: formatDate(selectedDate) });
@@ -149,7 +183,7 @@ export function TaskShowcase() {
     });
 
     if (readOnly) {
-      setNotice("Tarik kembali Daily Log terlebih dahulu untuk mengubahnya.");
+      setNotice(lockMessage ?? "Daily Log terkunci sehingga task tidak dapat diubah.");
       setNoticeIsError(false);
       return;
     }
@@ -172,6 +206,9 @@ export function TaskShowcase() {
         setDailyLogId(dailyLog.id);
         setDailyLogStatus(dailyLog.status);
         setDailyLogSubmittedAt(dailyLog.submittedAt);
+        setDailyLogEditable(dailyLog.editable);
+        setDailyLogDeadline(dailyLog.deadline);
+        setDailyLogRejectionReason(dailyLog.rejectionReason);
         setSavedTasks(dailyLog.tasks.map((task) => toTaskDraft(task, projects, masterData)));
         setDailyLogMissing(false);
         logger.info("Daily Log dibuat", { date: formatDate(selectedDate), dailyLogId: dailyLog.id });
@@ -190,7 +227,7 @@ export function TaskShowcase() {
   const saveTask = async (task: TaskFormDraft) => {
     const mode = task.id ? "update" : "create";
     if (readOnly) {
-      setFormError("Tarik kembali Daily Log terlebih dahulu untuk mengubahnya.");
+      setFormError(lockMessage ?? "Daily Log terkunci sehingga task tidak dapat disimpan.");
       return;
     }
 
@@ -261,7 +298,7 @@ export function TaskShowcase() {
 
   const deleteTask = (id: string) => {
     if (readOnly) {
-      setNotice("Tarik kembali Daily Log terlebih dahulu untuk mengubahnya.");
+      setNotice(lockMessage ?? "Daily Log terkunci sehingga task tidak dapat dihapus.");
       setNoticeIsError(false);
       return;
     }
@@ -286,19 +323,26 @@ export function TaskShowcase() {
     });
   };
 
-  const performSubmitDailyLog = async (id: number) => {
+  const performSubmitDailyLog = async (id: number, isResubmit: boolean) => {
     setSubmittingDailyLog(true);
     setNotice("");
     try {
       const updated = await taskService.submitDailyLog(id);
       setDailyLogStatus(updated.status);
       setDailyLogSubmittedAt(updated.submittedAt);
+      setDailyLogEditable(updated.editable);
+      setDailyLogDeadline(updated.deadline);
+      setDailyLogRejectionReason(updated.rejectionReason);
       setSavedTasks(updated.tasks.map((task) => toTaskDraft(task, projects, masterData)));
-      setNotice("Daily Log berhasil dikirim.");
+      setNotice(isResubmit ? "Daily Log berhasil dikirim ulang." : "Daily Log berhasil dikirim.");
       setNoticeIsError(false);
-      logger.info("Daily Log dikirim", { dailyLogId: id, status: updated.status, taskCount: updated.tasks.length });
+      logger.info(isResubmit ? "Daily Log dikirim ulang" : "Daily Log dikirim", {
+        dailyLogId: id,
+        status: updated.status,
+        taskCount: updated.tasks.length,
+      });
     } catch (error) {
-      logger.error("Gagal mengirim Daily Log", error, { dailyLogId: id });
+      logger.error(isResubmit ? "Gagal mengirim ulang Daily Log" : "Gagal mengirim Daily Log", error, { dailyLogId: id });
       setNotice(getErrorMessage(error));
       setNoticeIsError(true);
     } finally {
@@ -311,14 +355,23 @@ export function TaskShowcase() {
       return;
     }
 
+    if (dailyLogStatus !== "DRAF" && dailyLogStatus !== "DITOLAK") {
+      setNotice("Daily Log tidak dapat dikirim pada status saat ini.");
+      setNoticeIsError(true);
+      return;
+    }
+
+    const isResubmit = dailyLogStatus === "DITOLAK";
     const id = dailyLogId;
     setConfirmDialog({
-      title: "Kirim Daily Log?",
-      description: "Setelah dikirim, task tidak dapat diubah lagi sampai Daily Log ditarik kembali.",
-      confirmLabel: "Kirim Daily Log",
+      title: isResubmit ? "Kirim ulang Daily Log?" : "Kirim Daily Log?",
+      description: isResubmit
+        ? "Pastikan perbaikan sudah sesuai dengan catatan atasan. Setelah dikirim ulang, Daily Log kembali menunggu keputusan."
+        : "Setelah dikirim, task tidak dapat diubah lagi sampai Daily Log ditarik kembali.",
+      confirmLabel: isResubmit ? "Kirim Ulang" : "Kirim Daily Log",
       onConfirm: () => {
         setConfirmDialog(null);
-        void performSubmitDailyLog(id);
+        void performSubmitDailyLog(id, isResubmit);
       },
     });
   };
@@ -330,6 +383,9 @@ export function TaskShowcase() {
       const updated = await taskService.withdrawDailyLog(id);
       setDailyLogStatus(updated.status);
       setDailyLogSubmittedAt(updated.submittedAt);
+      setDailyLogEditable(updated.editable);
+      setDailyLogDeadline(updated.deadline);
+      setDailyLogRejectionReason(updated.rejectionReason);
       setSavedTasks(updated.tasks.map((task) => toTaskDraft(task, projects, masterData)));
       setNotice("Daily Log ditarik kembali menjadi Draf.");
       setNoticeIsError(false);
@@ -344,7 +400,7 @@ export function TaskShowcase() {
   };
 
   const withdrawDailyLog = () => {
-    if (!readOnly || dailyLogId === null || withdrawingDailyLog) {
+    if (!canWithdraw || dailyLogId === null || withdrawingDailyLog) {
       return;
     }
 
@@ -382,6 +438,10 @@ export function TaskShowcase() {
         status={dailyLogStatus}
         submittedAt={dailyLogSubmittedAt}
         readOnly={readOnly}
+        lockMessage={lockMessage}
+        deadlineLabel={deadlineLabel}
+        rejectionReason={dailyLogRejectionReason}
+        canWithdraw={canWithdraw}
         canSubmit={savedTasks.length > 0}
         submitting={submittingDailyLog}
         onSubmit={submitDailyLog}
@@ -417,7 +477,7 @@ export function TaskShowcase() {
           fieldErrors={fieldErrors}
         />
       </SidePanel>
-      {!panelOpen ? <button type="button" onClick={() => openNewTask()} className="fixed bottom-24 right-4 z-10 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 md:bottom-6 md:right-6">+ Tambah task</button> : null}
+      {!panelOpen && !readOnly ? <button type="button" onClick={() => openNewTask()} className="fixed bottom-24 right-4 z-10 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 md:bottom-6 md:right-6">+ Tambah task</button> : null}
       {notice ? <div role={noticeIsError ? "alert" : "status"} className={`fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg md:bottom-6 ${noticeIsError ? "bg-red-700" : "bg-slate-900"}`}>{notice}</div> : null}
       <Dialog
         open={confirmDialog !== null}
