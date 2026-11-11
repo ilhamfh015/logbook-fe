@@ -48,6 +48,7 @@ type TimelinePreviewProps = {
   onSubmit: () => void;
   withdrawing: boolean;
   onWithdraw: () => void;
+  variant?: "talent" | "review";
 };
 
 export function TimelinePreview({
@@ -67,6 +68,7 @@ export function TimelinePreview({
   onSubmit,
   withdrawing,
   onWithdraw,
+  variant = "talent",
 }: TimelinePreviewProps) {
   const activeSavedTasks = savedTasks.filter((task) => !task.deletedAt);
   const formattedDate = new Intl.DateTimeFormat("id-ID", {
@@ -195,81 +197,85 @@ export function TimelinePreview({
 
   return (
     <section className="min-w-0 flex-1 p-4 sm:p-5 lg:p-7">
-      <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-        <Home size={16} />
-        <span aria-hidden="true">›</span>
-        <span className="font-medium text-ink">Log Book</span>
-        <span aria-hidden="true">›</span>
-        <span className="font-semibold text-ink">{formattedDate}</span>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-          <button
-            type="button"
-            onClick={() => moveDate(-1)}
-            className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            aria-label="Hari sebelumnya"
-          >
-            <ChevronLeft size={19} />
-          </button>
-          <h1 className="text-lg font-bold tracking-tight sm:text-2xl lg:text-3xl">
-            {formattedDate}
-          </h1>
-          <button
-            type="button"
-            onClick={() => moveDate(1)}
-            className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            aria-label="Hari berikutnya"
-          >
-            <ChevronRight size={19} />
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500 sm:text-sm">
-          {status ? (
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                readOnly
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-amber-50 text-amber-700"
-              }`}
-            >
-              {dailyLogStatusLabel(status)}
-            </span>
-          ) : null}
-          {status === "DRAF" ? (
-            <button
-              type="button"
-              onClick={onSubmit}
-              disabled={!canSubmit || submitting}
-              title={canSubmit ? undefined : "Tambahkan minimal satu task sebelum mengirim."}
-              className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-            >
-              {submitting ? "Mengirim..." : "Kirim Daily Log"}
-            </button>
-          ) : null}
-          <div className="flex items-center gap-1">
-            <span>Total</span>
-            <strong className="text-ink">
-              {formatDuration(totalWorkedMinutes)}
-            </strong>
-            <span className="hidden sm:inline">(paralel dihitung sekali)</span>
-            <details className="relative">
-              <summary
-                className="list-none cursor-pointer rounded p-1 hover:bg-blue-50"
-                aria-label="Tentang perhitungan total jam"
-              >
-                <Info size={15} />
-              </summary>
-              <span className="absolute right-0 top-7 z-20 w-56 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-lg">
-                Rentang task yang waktunya bersamaan dihitung satu kali pada total
-                harian.
-              </span>
-            </details>
+      {variant === "talent" ? (
+        <>
+          <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            <Home size={16} />
+            <span aria-hidden="true">›</span>
+            <span className="font-medium text-ink">Log Book</span>
+            <span aria-hidden="true">›</span>
+            <span className="font-semibold text-ink">{formattedDate}</span>
           </div>
-        </div>
-      </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => moveDate(-1)}
+                className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                aria-label="Hari sebelumnya"
+              >
+                <ChevronLeft size={19} />
+              </button>
+              <h1 className="text-lg font-bold tracking-tight sm:text-2xl lg:text-3xl">
+                {formattedDate}
+              </h1>
+              <button
+                type="button"
+                onClick={() => moveDate(1)}
+                className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                aria-label="Hari berikutnya"
+              >
+                <ChevronRight size={19} />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500 sm:text-sm">
+              {status ? (
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    readOnly
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {dailyLogStatusLabel(status)}
+                </span>
+              ) : null}
+              {status === "DRAF" ? (
+                <button
+                  type="button"
+                  onClick={onSubmit}
+                  disabled={!canSubmit || submitting}
+                  title={canSubmit ? undefined : "Tambahkan minimal satu task sebelum mengirim."}
+                  className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                >
+                  {submitting ? "Mengirim..." : "Kirim Daily Log"}
+                </button>
+              ) : null}
+              <div className="flex items-center gap-1">
+                <span>Total</span>
+                <strong className="text-ink">
+                  {formatDuration(totalWorkedMinutes)}
+                </strong>
+                <span className="hidden sm:inline">(paralel dihitung sekali)</span>
+                <details className="relative">
+                  <summary
+                    className="list-none cursor-pointer rounded p-1 hover:bg-blue-50"
+                    aria-label="Tentang perhitungan total jam"
+                  >
+                    <Info size={15} />
+                  </summary>
+                  <span className="absolute right-0 top-7 z-20 w-56 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-lg">
+                    Rentang task yang waktunya bersamaan dihitung satu kali pada total
+                    harian.
+                  </span>
+                </details>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
 
-      {readOnly ? (
+      {variant === "talent" && readOnly ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">
           <span>
             Daily Log sudah dikirim{submittedLabel ? ` pada ${submittedLabel}` : ""} dan menunggu keputusan. Tarik kembali jika perlu diperbarui.
@@ -285,14 +291,20 @@ export function TimelinePreview({
         </div>
       ) : null}
 
-      {emptyMessage ? (
+      {variant === "talent" && emptyMessage ? (
         <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status">
           {emptyMessage}
         </p>
       ) : null}
-      {loading ? <p className="mt-4 text-sm text-slate-500" role="status">Memuat task...</p> : null}
+      {variant === "talent" && loading ? <p className="mt-4 text-sm text-slate-500" role="status">Memuat task...</p> : null}
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      {variant === "review" ? (
+        <div className="mt-4 flex justify-end text-sm text-slate-500">
+          Total {formatDuration(totalWorkedMinutes)} (paralel dihitung sekali)
+        </div>
+      ) : null}
+
+      <div className={`${variant === "review" ? "" : "mt-5"} flex flex-wrap gap-2`}>
         {projectSummaries.map((project) => (
           <ProjectChip
             key={project.name}
@@ -303,7 +315,11 @@ export function TimelinePreview({
         ))}
       </div>
 
-      <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-3 lg:p-4">
+      <div
+        aria-label={variant === "review" ? "Linimasa Daily Log, hanya baca" : undefined}
+        role={variant === "review" ? "group" : undefined}
+        className="mt-5 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-3 lg:p-4"
+      >
         <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-2 sm:grid-cols-[3.75rem_minmax(0,1fr)] sm:gap-3">
           <div
             aria-hidden="true"
@@ -324,25 +340,28 @@ export function TimelinePreview({
             className="relative grid min-w-0 grid-cols-3 gap-x-1.5 sm:gap-x-2"
             style={{ gridTemplateRows: "repeat(18, minmax(0, 40px)) 24px" }}
           >
-            {Array.from({ length: 18 }, (_, index) => (
-              <button
-                key={index}
-                type="button"
-                aria-label={`Tambah task pukul ${slotToInputTime(index + 1)}`}
-                onClick={() => onAddTask(slotToInputTime(index + 1))}
-                disabled={readOnly}
-                className={`col-span-3 h-full border-t border-slate-100 bg-transparent text-left ${
-                  readOnly ? "cursor-not-allowed" : "cursor-pointer hover:bg-blue-50/40"
-                }`}
-                style={{ gridRow: index + 1 }}
-              />
-            ))}
+            {variant === "talent"
+              ? Array.from({ length: 18 }, (_, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    aria-label={`Tambah task pukul ${slotToInputTime(index + 1)}`}
+                    onClick={() => onAddTask(slotToInputTime(index + 1))}
+                    disabled={readOnly}
+                    className={`col-span-3 h-full border-t border-slate-100 bg-transparent text-left ${
+                      readOnly ? "cursor-not-allowed" : "cursor-pointer hover:bg-blue-50/40"
+                    }`}
+                    style={{ gridRow: index + 1 }}
+                  />
+                ))
+              : null}
             {positionedTasks.map((task) => (
               <TimelineBlock
                 key={task.id}
                 task={task}
                 onEdit={onEditTask}
                 readOnly={readOnly}
+                variant={variant}
               />
             ))}
             <div
@@ -354,7 +373,7 @@ export function TimelinePreview({
             </div>
           </div>
         </div>
-        {!readOnly ? (
+        {variant === "talent" && !readOnly ? (
           <button
             type="button"
             onClick={() => onAddTask()}
@@ -365,7 +384,7 @@ export function TimelinePreview({
           </button>
         ) : null}
       </div>
-      <section
+      {variant === "talent" ? <section
         className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
         aria-live="polite"
       >
@@ -430,7 +449,7 @@ export function TimelinePreview({
             </li>
           ))}
         </ul>
-      </section>
+      </section> : null}
     </section>
   );
 }
@@ -465,7 +484,7 @@ function dailyLogStatusLabel(status: string | null) {
   return status ? (labels[status] ?? status) : "Draf";
 }
 
-function formatDuration(minutes: number) {
+export function formatDuration(minutes: number) {
   if (minutes < 60) return `${minutes} m`;
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
@@ -486,13 +505,15 @@ function TimelineBlock({
   task,
   onEdit,
   readOnly,
+  variant,
 }: {
   task: TimelineTask;
   onEdit: (task: TaskDraft) => void;
   readOnly: boolean;
+  variant: "talent" | "review";
 }) {
   const orange = task.tone === "orange";
-  const interactive = Boolean(task.sourceTask) && !readOnly;
+  const interactive = variant === "talent" && Boolean(task.sourceTask) && !readOnly;
   const gridColumn =
     task.column === "full"
       ? "1 / -1"
@@ -513,7 +534,7 @@ function TimelineBlock({
       }}
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
-      className={`group z-10 min-w-0 overflow-hidden rounded-xl border p-2.5 sm:p-3 lg:p-4 ${orange ? "border-orange-200 bg-orange-50" : "border-blue-200 bg-blue-50"} ${interactive ? "cursor-pointer hover:brightness-95" : ""}`}
+      className={`group z-10 min-w-0 overflow-hidden ${variant === "review" ? "rounded-lg border p-1 sm:p-1.5" : "rounded-xl border p-2.5 sm:p-3 lg:p-4"} ${orange ? "border-orange-200 bg-orange-50" : "border-blue-200 bg-blue-50"} ${interactive ? "cursor-pointer hover:brightness-95" : ""}`}
       style={{
         gridRow: `${task.startSlot} / span ${task.durationSlots}`,
         gridColumn,
@@ -522,6 +543,23 @@ function TimelineBlock({
           : {}),
       }}
     >
+      {variant === "review" ? (
+        <>
+          <div className="flex min-w-0 items-center justify-between gap-1 leading-none">
+            <span className={`truncate text-[9px] font-bold ${orange ? "text-orange-700" : "text-blue-700"}`}>
+              {task.project}
+            </span>
+            {task.badge ? <span className="shrink-0 text-[9px] font-semibold text-slate-700">{task.badge}</span> : null}
+          </div>
+          <p className="mt-0.5 truncate text-[10px] font-bold leading-3 text-ink" title={task.title}>{task.title}</p>
+          <p className="mt-0.5 line-clamp-1 text-[9px] leading-3 text-slate-700" title={task.description}>{task.description}</p>
+          {task.sourceTask?.obstacle ? (
+            <p className="line-clamp-1 text-[9px] leading-3 text-slate-600" title={`Kendala: ${task.sourceTask.obstacle}`}>
+              Kendala: {task.sourceTask.obstacle}
+            </p>
+          ) : null}
+        </>
+      ) : <>
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={`inline-flex max-w-full items-center gap-2 truncate rounded-full px-2.5 py-1 text-[10px] font-bold sm:px-3 sm:text-xs ${
@@ -552,6 +590,7 @@ function TimelineBlock({
       <p className="mt-1 text-xs leading-5 text-slate-700 sm:text-sm">
         {task.description}
       </p>
+      </>}
     </article>
   );
 }
