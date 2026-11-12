@@ -30,6 +30,14 @@ export type ApiTask = {
   obstacle: string | null;
 };
 
+export type DayInfo = {
+  date: string;
+  holidayName: string | null;
+  onLeave: boolean;
+  weekend: boolean;
+  workingDay: boolean;
+};
+
 export type DailyLog = {
   id: number;
   logDate: string;
@@ -43,6 +51,7 @@ export type DailyLog = {
   deadline: string | null;
   totalDurationMinutes: number;
   tasks: ApiTask[];
+  day?: DayInfo;
 };
 
 type TaskRequest = {
@@ -60,6 +69,12 @@ export const taskService = {
   getProjects: () => apiFetch<ProjectOption[]>("/api/projects"),
 
   getMasterData: () => apiFetch<TaskMasterData>("/api/tasks/master-data"),
+
+  getCalendar: (from: string, to: string, userId?: number) => {
+    const params = new URLSearchParams({ from, to });
+    if (userId !== undefined) params.set("userId", String(userId));
+    return apiFetch<DayInfo[]>(`/api/calendar?${params.toString()}`);
+  },
 
   getDailyLog: (date: string) =>
     apiFetch<DailyLog>(`/api/daily-logs?date=${encodeURIComponent(date)}`),
