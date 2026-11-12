@@ -44,6 +44,10 @@ type TimelinePreviewProps = {
   status: string | null;
   submittedAt: string | null;
   readOnly: boolean;
+  lockMessage: string | null;
+  deadlineLabel: string | null;
+  rejectionReason: string | null;
+  canWithdraw: boolean;
   canSubmit: boolean;
   submitting: boolean;
   onSubmit: () => void;
@@ -64,6 +68,10 @@ export function TimelinePreview({
   status,
   submittedAt,
   readOnly,
+  lockMessage,
+  deadlineLabel,
+  rejectionReason,
+  canWithdraw,
   canSubmit,
   submitting,
   onSubmit,
@@ -201,95 +209,135 @@ export function TimelinePreview({
     <section className="min-w-0 flex-1 p-4 sm:p-5 lg:p-7">
       {variant === "talent" ? (
         <>
-          <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <Home size={16} />
-            <span aria-hidden="true">›</span>
-            <span className="font-medium text-ink">Log Book</span>
-            <span aria-hidden="true">›</span>
-            <span className="font-semibold text-ink">{formattedDate}</span>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <button
-                type="button"
-                onClick={() => moveDate(-1)}
-                className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                aria-label="Hari sebelumnya"
-              >
-                <ChevronLeft size={19} />
-              </button>
-              <h1 className="text-lg font-bold tracking-tight sm:text-2xl lg:text-3xl">
-                {formattedDate}
-              </h1>
-              <button
-                type="button"
-                onClick={() => moveDate(1)}
-                className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                aria-label="Hari berikutnya"
-              >
-                <ChevronRight size={19} />
-              </button>
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500 sm:text-sm">
-              {status ? (
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    readOnly
-                      ? "bg-emerald-50 text-emerald-700"
+      <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+        <Home size={16} />
+        <span aria-hidden="true">›</span>
+        <span className="font-medium text-ink">Log Book</span>
+        <span aria-hidden="true">›</span>
+        <span className="font-semibold text-ink">{formattedDate}</span>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => moveDate(-1)}
+            className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label="Hari sebelumnya"
+          >
+            <ChevronLeft size={19} />
+          </button>
+          <h1 className="text-lg font-bold tracking-tight sm:text-2xl lg:text-3xl">
+            {formattedDate}
+          </h1>
+          <button
+            type="button"
+            onClick={() => moveDate(1)}
+            className="rounded-xl border border-slate-200 bg-white p-2 text-ink shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label="Hari berikutnya"
+          >
+            <ChevronRight size={19} />
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500 sm:text-sm">
+          {status ? (
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                status === "MENUNGGU"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : status === "DITOLAK"
+                    ? "bg-red-50 text-red-700"
+                    : readOnly
+                      ? "bg-slate-100 text-slate-600"
                       : "bg-amber-50 text-amber-700"
-                  }`}
-                >
-                  {dailyLogStatusLabel(status)}
-                </span>
-              ) : null}
-              {status === "DRAF" ? (
-                <button
-                  type="button"
-                  onClick={onSubmit}
-                  disabled={!canSubmit || submitting}
-                  title={canSubmit ? undefined : "Tambahkan minimal satu task sebelum mengirim."}
-                  className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-                >
-                  {submitting ? "Mengirim..." : "Kirim Daily Log"}
-                </button>
-              ) : null}
-              <div className="flex items-center gap-1">
-                <span>Total</span>
-                <strong className="text-ink">
-                  {formatDuration(totalWorkedMinutes)}
-                </strong>
-                <span className="hidden sm:inline">(paralel dihitung sekali)</span>
-                <details className="relative">
-                  <summary
-                    className="list-none cursor-pointer rounded p-1 hover:bg-blue-50"
-                    aria-label="Tentang perhitungan total jam"
-                  >
-                    <Info size={15} />
-                  </summary>
-                  <span className="absolute right-0 top-7 z-20 w-56 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-lg">
-                    Rentang task yang waktunya bersamaan dihitung satu kali pada total
-                    harian.
-                  </span>
-                </details>
-              </div>
-            </div>
+              }`}
+            >
+              {dailyLogStatusLabel(status)}
+            </span>
+          ) : null}
+          {(status === "DRAF" || status === "DITOLAK") && !readOnly ? (
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={!canSubmit || submitting}
+              title={canSubmit ? undefined : "Tambahkan minimal satu task sebelum mengirim."}
+              className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              {submitting
+                ? "Mengirim..."
+                : status === "DITOLAK"
+                  ? "Kirim Ulang"
+                  : "Kirim Daily Log"}
+            </button>
+          ) : null}
+          <div className="flex items-center gap-1">
+            <span>Total</span>
+            <strong className="text-ink">
+              {formatDuration(totalWorkedMinutes)}
+            </strong>
+            <span className="hidden sm:inline">(paralel dihitung sekali)</span>
+            <details className="relative">
+              <summary
+                className="list-none cursor-pointer rounded p-1 hover:bg-blue-50"
+                aria-label="Tentang perhitungan total jam"
+              >
+                <Info size={15} />
+              </summary>
+              <span className="absolute right-0 top-7 z-20 w-56 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-lg">
+                Rentang task yang waktunya bersamaan dihitung satu kali pada total
+                harian.
+              </span>
+            </details>
           </div>
+        </div>
+      </div>
         </>
       ) : null}
 
-      {variant === "talent" && readOnly ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">
+      {variant === "talent" && status === "DITOLAK" ? (
+        <div
+          className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          role="status"
+        >
+          <p className="font-semibold">Daily Log ditolak atasan.</p>
+          {rejectionReason ? (
+            <p className="mt-1">Catatan atasan: {rejectionReason}</p>
+          ) : null}
+          <p className="mt-1 text-red-700">
+            {readOnly
+              ? "Perbaikan hanya dapat dilakukan pada tanggal hari ini."
+              : "Perbaiki task bila perlu, lalu kirim ulang pada hari ini."}
+          </p>
+        </div>
+      ) : null}
+
+      {variant === "talent" && lockMessage ? (
+        <div
+          className={`mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm ${
+            canWithdraw
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-slate-200 bg-slate-50 text-slate-700"
+          }`}
+          role="status"
+        >
           <span>
-            Daily Log sudah dikirim{submittedLabel ? ` pada ${submittedLabel}` : ""} dan menunggu keputusan. Tarik kembali jika perlu diperbarui.
+            {lockMessage}
+            {status === "MENUNGGU" && submittedLabel
+              ? ` Dikirim pada ${submittedLabel}.`
+              : null}
+            {status !== "MENUNGGU" && deadlineLabel
+              ? ` Batas pengisian ${deadlineLabel}.`
+              : null}
           </span>
-          <button
-            type="button"
-            onClick={onWithdraw}
-            disabled={withdrawing}
-            className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
-          >
-            {withdrawing ? "Menarik..." : "Tarik Kembali"}
-          </button>
+          {canWithdraw ? (
+            <button
+              type="button"
+              onClick={onWithdraw}
+              disabled={withdrawing}
+              className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+            >
+              {withdrawing ? "Menarik..." : "Tarik Kembali"}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -472,7 +520,7 @@ function timeToMinutes(value: string) {
     : 0;
 }
 
-function dailyLogStatusLabel(status: string | null) {
+export function dailyLogStatusLabel(status: string | null) {
   const labels: Record<string, string> = {
     DRAF: "Draf",
     MENUNGGU: "Menunggu",
@@ -533,14 +581,14 @@ function TimelineBlock({
           : "3";
   return (
     <article
-      onClick={() => {
+      onClick={variant === "talent" ? () => {
         if (interactive && task.sourceTask) onEdit(task.sourceTask);
-      }}
-      onKeyDown={(event) => {
+      } : undefined}
+      onKeyDown={variant === "talent" ? (event) => {
         if (interactive && task.sourceTask && (event.key === "Enter" || event.key === " ")) {
           onEdit(task.sourceTask);
         }
-      }}
+      } : undefined}
       title={variant === "review" ? reviewTitle : undefined}
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
