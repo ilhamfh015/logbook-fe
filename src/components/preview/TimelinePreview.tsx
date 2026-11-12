@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { ProjectChip } from "@/components/shared/ProjectChip";
 import { nextStartTime } from "@/lib/taskTime";
+import type { DayInfo } from "@/services/taskService";
 import type { ProjectColor, TaskDraft } from "@/types/task";
 
 const hourLabels = Array.from(
@@ -42,6 +43,7 @@ type TimelinePreviewProps = {
   loading: boolean;
   emptyMessage: string;
   status: string | null;
+  day: DayInfo | null;
   submittedAt: string | null;
   readOnly: boolean;
   lockMessage: string | null;
@@ -66,6 +68,7 @@ export function TimelinePreview({
   loading,
   emptyMessage,
   status,
+  day,
   submittedAt,
   readOnly,
   lockMessage,
@@ -92,6 +95,24 @@ export function TimelinePreview({
         dateStyle: "medium",
         timeStyle: "short",
       }).format(new Date(submittedAt))
+    : null;
+  const dayLabel = day
+    ? day.holidayName
+      ? `Libur: ${day.holidayName}`
+      : day.onLeave
+        ? "Cuti"
+        : day.weekend
+          ? "Akhir pekan"
+          : null
+    : null;
+  const dayNote = day && !day.workingDay
+    ? `${
+        day.holidayName
+          ? `Libur nasional: ${day.holidayName}. `
+          : day.onLeave
+            ? "Kamu sedang cuti. "
+            : "Akhir pekan. "
+      }Hari ini tidak akan ditandai Terlewat, tetapi tetap boleh diisi bila kamu bekerja.`
     : null;
   const moveDate = (days: number) => {
     const nextDate = new Date(date);
@@ -254,6 +275,19 @@ export function TimelinePreview({
               {dailyLogStatusLabel(status)}
             </span>
           ) : null}
+          {dayLabel ? (
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                day?.holidayName
+                  ? "bg-sky-50 text-sky-700"
+                  : day?.onLeave
+                    ? "bg-violet-50 text-violet-700"
+                    : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {dayLabel}
+            </span>
+          ) : null}
           {(status === "DRAF" || status === "DITOLAK") && !readOnly ? (
             <button
               type="button"
@@ -291,6 +325,15 @@ export function TimelinePreview({
         </div>
       </div>
         </>
+      ) : null}
+
+      {variant === "talent" && dayNote ? (
+        <p
+          className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800"
+          role="status"
+        >
+          {dayNote}
+        </p>
       ) : null}
 
       {variant === "talent" && status === "DITOLAK" ? (

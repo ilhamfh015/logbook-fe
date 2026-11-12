@@ -11,6 +11,7 @@ import { logger } from "@/lib/logger";
 import {
   taskService,
   type DailyLog,
+  type DayInfo,
   type ProjectOption,
   type TaskMasterData,
 } from "@/services/taskService";
@@ -45,6 +46,7 @@ export function TaskShowcase() {
   const [dailyLogRejectionReason, setDailyLogRejectionReason] = useState<string | null>(null);
   const [dailyLogMissing, setDailyLogMissing] = useState(false);
   const [dailyLogLoading, setDailyLogLoading] = useState(true);
+  const [dayInfo, setDayInfo] = useState<DayInfo | null>(null);
   const [submittingDailyLog, setSubmittingDailyLog] = useState(false);
   const [withdrawingDailyLog, setWithdrawingDailyLog] = useState(false);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -64,8 +66,12 @@ export function TaskShowcase() {
   const isPastDate = selectedDateKey < todayKey;
   const isFutureDate = selectedDateKey > todayKey;
   // Hanya tanggal hari ini yang boleh diisi; hari yang sudah lewat maupun yang
-  // belum tiba terkunci. Server juga mengirim `editable` sebagai sumber kebenaran.
-  const readOnly = isPastDate || isFutureDate || !dailyLogEditable;
+  // belum tiba terkunci. Server juga mengirim `editable` sebagai sumber
+  // kebenaran, termasuk saat aturan batas hari dimatikan sehingga hari TERLEWAT
+  // boleh dibuka kembali menjadi DRAF.
+  const readOnly = dailyLogMissing
+    ? isPastDate || isFutureDate || !dailyLogEditable
+    : !dailyLogEditable;
   const canWithdraw = !isPastDate && !isFutureDate && dailyLogStatus === "MENUNGGU";
   const lockMessage = isPastDate
     ? "Tanggal ini sudah lewat sehingga Daily Log terkunci dan tidak dapat diubah."
@@ -96,9 +102,28 @@ export function TaskShowcase() {
     setDailyLogDeadline(null);
     setDailyLogRejectionReason(null);
     setSavedTasks([]);
+
+    const dateKey = formatDate(selectedDate);
+    // Data kalender (libur nasional, cuti, akhir pekan) dimuat bersama Daily Log
+    // agar label hari tetap tampil walau Daily Log tanggal itu belum ada.
+    const [logResult, calendarResult] = await Promise.allSettled([
+      taskService.getDailyLog(dateKey),
+      taskService.getCalendar(dateKey, dateKey),
+    ]);
+
+    if (currentRequestId !== requestId.current) return false;
+
+    const dayFromLog = logResult.status === "fulfilled" ? logResult.value.day ?? null : null;
+    if (calendarResult.status === "fulfilled") {
+      setDayInfo(calendarResult.value[0] ?? dayFromLog);
+    } else {
+      setDayInfo(dayFromLog);
+      logger.warn("Gagal memuat kalender hari", { date: dateKey });
+    }
+
     try {
-      const dailyLog = await taskService.getDailyLog(formatDate(selectedDate));
-      if (currentRequestId !== requestId.current) return false;
+      if (logResult.status === "rejected") throw logResult.reason;
+      const dailyLog = logResult.value;
       setDailyLogId(dailyLog.id);
       setDailyLogStatus(dailyLog.status);
       setDailyLogSubmittedAt(dailyLog.submittedAt);
@@ -108,7 +133,6 @@ export function TaskShowcase() {
       setSavedTasks(dailyLog.tasks.map((task) => toTaskDraft(task, projects, masterData)));
       return true;
     } catch (error) {
-      if (currentRequestId !== requestId.current) return false;
       setDailyLogId(null);
       setDailyLogStatus(null);
       setDailyLogSubmittedAt(null);
@@ -117,11 +141,11 @@ export function TaskShowcase() {
       setDailyLogRejectionReason(null);
       setSavedTasks([]);
       if (error instanceof ApiError && error.status === 404) {
-        logger.info("Daily Log belum tersedia", { date: formatDate(selectedDate) });
+        logger.info("Daily Log belum tersedia", { date: dateKey });
         setDailyLogMissing(true);
         return false;
       }
-      logger.error("Gagal memuat Daily Log", error, { date: formatDate(selectedDate) });
+      logger.error("Gagal memuat Daily Log", error, { date: dateKey });
       setNotice(getErrorMessage(error));
       setNoticeIsError(true);
       return false;
@@ -436,6 +460,7 @@ export function TaskShowcase() {
         loading={dailyLogLoading}
         emptyMessage={dailyLogMissing ? "Daily Log untuk tanggal ini belum tersedia." : ""}
         status={dailyLogStatus}
+        day={dayInfo}
         submittedAt={dailyLogSubmittedAt}
         readOnly={readOnly}
         lockMessage={lockMessage}
