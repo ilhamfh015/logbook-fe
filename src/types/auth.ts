@@ -1,3 +1,4 @@
+
 export type UserRole = "TALENT" | "ATASAN" | "ADMIN";
 
 export type AuthUser = {
@@ -9,6 +10,7 @@ export type AuthUser = {
   admin: boolean;
   mustChangePassword: boolean;
   roles: UserRole[];
+  isActive?: boolean;
 };
 
 export type UserRoles = {
@@ -21,4 +23,16 @@ export type UserRoles = {
   admin: boolean;
   emailAtasan: string | null;
   teamSize: number;
+};
+
+export type AuthApiResponse = {
+  id: number;
+  email: string;
+  fullName: string;
+  jenis: string | null;
+  emailAtasan: string | null;
+  admin: boolean;
+  mustChangePassword: boolean;
+  isActive?: boolean;
+  is_active?: boolean;
 };

@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { authService } from "@/services/authService";
 import type { AuthUser } from "@/types/auth";
@@ -17,11 +24,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
+
     authService
       .me()
       .then((current) => {
@@ -33,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => {
         if (mounted) setLoading(false);
       });
+
     return () => {
       mounted = false;
     };
@@ -65,12 +75,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await authService.logout();
     } finally {
       setUser(null);
+      router.replace("/login");
     }
-  }, []);
+  }, [router]);
 
   const value = useMemo(
     () => ({ user, loading, login, logout }),
-    [user, loading, login, logout]
+    [user, loading, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -78,6 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth harus dipakai di dalam AuthProvider");
+
+  if (!context) {
+    throw new Error("useAuth harus dipakai di dalam AuthProvider");
+  }
+
   return context;
 }
