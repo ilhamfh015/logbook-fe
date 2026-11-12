@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TimelinePreview, formatDuration } from "@/components/preview/TimelinePreview";
+import { ReviewDecisionPanel } from "@/components/review/ReviewDecisionPanel";
 import { ApiError } from "@/services/apiClient";
 import { getTalentDailyLog } from "@/services/reviewService";
 import type { ReviewDailyLog, ReviewStatus } from "@/types/review";
@@ -29,6 +30,7 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
     log: ReviewDailyLog | null;
     errorMessage: string;
   }>({ key: "", log: null, errorMessage: "" });
+  const [override, setOverride] = useState<{ key: string; log: ReviewDailyLog } | null>(null);
   const requestKey = `${userId}:${dateIso}:${retryCount}`;
 
   useEffect(() => {
@@ -55,7 +57,11 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
   }, [dateIso, requestKey, userId]);
 
   const loading = requestResult.key !== requestKey;
-  const log = loading ? null : requestResult.log;
+  const log = loading
+    ? null
+    : override?.key === requestKey
+      ? override.log
+      : requestResult.log;
   const errorMessage = loading ? "" : requestResult.errorMessage;
 
   if (loading) {
@@ -182,9 +188,10 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
           </section>
         ) : null}
 
-        <div className="mt-5">
-          {/* TODO tahap berikutnya: panel tombol keputusan */}
-        </div>
+        <ReviewDecisionPanel
+          log={log}
+          onUpdated={(updatedLog) => setOverride({ key: requestKey, log: updatedLog })}
+        />
       </aside>
     </div>
   );
