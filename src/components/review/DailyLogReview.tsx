@@ -138,6 +138,7 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
           loading={false}
           emptyMessage=""
           status={null}
+          day={null}
           submittedAt={log.submittedAt}
           readOnly
           lockMessage={null}
