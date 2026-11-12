@@ -56,8 +56,9 @@ export function getReviewActions(
     case "Ditolak":
       return noActions("Daily Log ini ditolak dan menunggu perbaikan talent.");
     case "Draf":
-    case "Draf dibuka kembali":
       return noActions("Daily Log ini masih berstatus Draf.");
+    case "Draf dibuka kembali":
+      return noActions("Daily Log ini dibuka kembali sebagai draf dan menunggu talent memperbaikinya.");
     case "Terlewat":
     default:
       return noActions("Daily Log ini belum bisa diputuskan.");
