@@ -140,6 +140,10 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
           status={null}
           submittedAt={log.submittedAt}
           readOnly
+          lockMessage={null}
+          deadlineLabel={null}
+          rejectionReason={null}
+          canWithdraw={false}
           canSubmit={false}
           submitting={false}
           onSubmit={() => undefined}
