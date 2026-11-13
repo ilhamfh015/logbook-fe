@@ -18,6 +18,7 @@ export function AppHeader() {
   const profileRef = useRef<HTMLDivElement>(null);
 
   const isAtasanPage = pathname.startsWith("/atasan");
+  const isAdminPage = pathname.startsWith("/admin");
 
   const roleLabel = user?.roles.includes("ATASAN")
     ? "Atasan"
@@ -78,7 +79,7 @@ export function AppHeader() {
         <FileText size={16} />
         <span aria-hidden="true">›</span>
         <span className="font-medium text-ink">
-          {isAtasanPage ? "Tim" : "Log Book"}
+          {isAtasanPage ? "Tim" : isAdminPage ? "Libur & Cuti" : "Log Book"}
         </span>
       </div>
 
