@@ -11,6 +11,14 @@ npm run dev
 
 Buka `http://localhost:3000`.
 
+## Unit test
+
+Jalankan unit test dengan Vitest:
+
+```bash
+npm test
+```
+
 ## Struktur awal
 
 - `src/app`: routing App Router
