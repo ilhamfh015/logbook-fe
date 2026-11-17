@@ -3,7 +3,14 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskShowcase } from "@/components/preview/TaskShowcase";
 import { ApiError } from "@/services/apiClient";
+import { settingsService } from "@/services/settingsService";
 import { taskService, type DailyLog } from "@/services/taskService";
+
+vi.mock("@/services/settingsService", () => ({
+  settingsService: {
+    getSettings: vi.fn(),
+  },
+}));
 
 vi.mock("@/services/taskService", () => ({
   taskService: {
@@ -23,6 +30,7 @@ vi.mock("@/services/taskService", () => ({
 }));
 
 const mocked = vi.mocked(taskService);
+const mockedSettings = vi.mocked(settingsService);
 const dailyLog: DailyLog = {
   id: 55,
   logDate: "2026-11-17",
@@ -73,6 +81,12 @@ describe("TaskShowcase delete errors", () => {
       { date: "2026-11-17", holidayName: null, onLeave: false, weekend: false, workingDay: true },
     ]);
     mocked.getDailyLog.mockResolvedValue(dailyLog);
+    mockedSettings.getSettings.mockResolvedValue({
+      workStart: "08:00",
+      workEnd: "17:00",
+      onboarded: true,
+      activeDate: "2026-11-17",
+    });
     mocked.create.mockResolvedValue({
       id: 8,
       projectId: 1,
