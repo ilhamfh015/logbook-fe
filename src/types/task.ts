@@ -17,6 +17,8 @@ export type TaskDraft = {
   projectColor: ProjectColor;
   ticket: string;
   startTime: string;
+  /** Menit mulai absolut dari 00.00 tanggal Daily Log (0 - 2879). */
+  startMinute?: number;
   durationMinutes: number;
   type: TaskType;
   summary: string;
@@ -32,6 +34,7 @@ export type DailyLogTaskApi = {
   workStatusId: number;
   ticket: string | null;
   startTime: string;
+  startMinute: number;
   durationMinutes: number;
   summary: string;
   obstacle: string | null;

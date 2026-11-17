@@ -1,4 +1,5 @@
 import { apiFetch } from "@/services/apiClient";
+import { resolveStartMinute } from "@/lib/taskTime";
 import type { TaskDraft } from "@/types/task";
 
 export type ProjectOption = {
@@ -25,6 +26,7 @@ export type ApiTask = {
   workStatusId: number;
   ticket: string | null;
   startTime: string;
+  startMinute: number;
   durationMinutes: number;
   summary: string;
   obstacle: string | null;
@@ -78,6 +80,7 @@ type TaskRequest = {
   workStatusId: number;
   ticket: string | null;
   startTime: string;
+  startMinute: number;
   durationMinutes: number;
   summary: string;
   obstacle: string | null;
@@ -145,6 +148,9 @@ function toTaskRequest(task: TaskDraft): TaskRequest {
     workStatusId: task.workStatusId,
     ticket: task.ticket || null,
     startTime: task.startTime,
+    // Backend menyimpan menit absolut sehingga task dini hari (00.00 - 08.00)
+    // tetap dihitung pada tanggal Daily Log-nya.
+    startMinute: resolveStartMinute(task),
     durationMinutes: task.durationMinutes,
     summary: task.summary,
     obstacle: task.obstacle?.trim() || null,
