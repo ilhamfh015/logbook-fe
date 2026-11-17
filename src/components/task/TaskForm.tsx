@@ -192,17 +192,10 @@ export function TaskForm({
         <section aria-label="Lanjutkan pekerjaan" className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
           {continueSuggestions.map((suggestion) => {
             const label = suggestion.ticket || suggestion.project?.project_name || "task sebelumnya";
-            const summary = suggestion.summary.replace(/[.!?\s]+$/, "");
             return (
               <div key={suggestion.key} className="flex flex-wrap items-center justify-between gap-3">
                 <p className="min-w-0 flex-1 text-sm text-slate-700">
-                  Lanjutkan <span className="font-semibold text-ink">{label}</span>
-                  {summary ? (
-                    <>
-                      {" "}
-                      <span className="text-slate-600 line-clamp-2">{summary}</span>
-                    </>
-                  ) : null}?
+                  Lanjutkan <span className="font-semibold text-ink">{label}</span>?
                 </p>
                 <button
                   type="button"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TimelinePreview, dailyLogStatusLabel } from "@/components/preview/TimelinePreview";
 import { Dialog } from "@/components/shared/Dialog";
 import { SidePanel } from "@/components/shared/SidePanel";
@@ -57,8 +57,8 @@ export function TaskShowcase() {
     hints: SubmitHintItem[];
   } | null>(null);
   const [withdrawingDailyLog, setWithdrawingDailyLog] = useState(false);
+  const [previousDayTasks, setPreviousDayTasks] = useState<TaskFormDraft[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
-  const [continueTasks, setContinueTasks] = useState<ContinueTask[]>([]);
   const [masterData, setMasterData] = useState(initialMasterData);
   const [lookupLoading, setLookupLoading] = useState(true);
   const [lookupError, setLookupError] = useState("");
@@ -111,13 +111,17 @@ export function TaskShowcase() {
     setDailyLogDeadline(null);
     setDailyLogRejectionReason(null);
     setSavedTasks([]);
+    setPreviousDayTasks([]);
 
     const dateKey = formatDate(selectedDate);
+    const previousDate = addDays(selectedDate, -1);
+    const previousDateKey = formatDate(previousDate);
     // Data kalender (libur nasional, cuti, akhir pekan) dimuat bersama Daily Log
     // agar label hari tetap tampil walau Daily Log tanggal itu belum ada.
-    const [logResult, calendarResult] = await Promise.allSettled([
+    const [logResult, calendarResult, previousLogResult] = await Promise.allSettled([
       taskService.getDailyLog(dateKey),
       taskService.getCalendar(dateKey, dateKey),
+      taskService.getDailyLog(previousDateKey),
     ]);
 
     if (currentRequestId !== requestId.current) return false;
@@ -128,6 +132,14 @@ export function TaskShowcase() {
     } else {
       setDayInfo(dayFromLog);
       logger.warn("Gagal memuat kalender hari", { date: dateKey });
+    }
+
+    if (previousLogResult.status === "fulfilled") {
+      setPreviousDayTasks(
+        previousLogResult.value.tasks.map((task) => toTaskDraft(task, projects, masterData)),
+      );
+    } else if (!(previousLogResult.reason instanceof ApiError && previousLogResult.reason.status === 404)) {
+      logger.warn("Gagal memuat Daily Log hari sebelumnya", { date: previousDateKey });
     }
 
     try {
@@ -196,20 +208,36 @@ export function TaskShowcase() {
     };
   }, [loadDailyLog, lookupError, lookupLoading]);
 
-  useEffect(() => {
-    let active = true;
-    taskService.getContinueTasks()
-      .then((tasks) => {
-        if (active) setContinueTasks(tasks);
-      })
-      .catch((error: unknown) => {
-        // Saran bersifat tambahan: kegagalannya tidak boleh menghalangi form.
-        if (active) {
-          logger.warn("Gagal memuat saran lanjutkan", { message: getErrorMessage(error) });
-        }
-      });
-    return () => { active = false; };
-  }, []);
+  const continueTasks = useMemo<ContinueTask[]>(() => {
+    const activeTasks = savedTasks.filter((task) => !task.deletedAt && task.project?.trim());
+    if (activeTasks.length === 0) return [];
+
+    const toMinute = (task: TaskFormDraft) => {
+      if (typeof task.startMinute === "number" && Number.isFinite(task.startMinute)) {
+        return task.startMinute;
+      }
+      const [hours, minutes] = (task.startTime ?? "").slice(0, 5).split(":").map(Number);
+      return Number.isFinite(hours) && Number.isFinite(minutes) ? hours * 60 + minutes : 0;
+    };
+
+    const lastTask = [...activeTasks].sort(
+      (a, b) => toMinute(a) + a.durationMinutes - (toMinute(b) + b.durationMinutes),
+    ).at(-1);
+    if (!lastTask?.project?.trim()) return [];
+
+    return [{
+      id: lastTask.projectId ?? 0,
+      project: lastTask.project.trim(),
+      color: lastTask.projectColor ?? null,
+      ticket: null,
+      startMinute: null,
+      durationMinutes: lastTask.durationMinutes,
+      type: lastTask.type || null,
+      summary: "",
+      workStatus: null,
+      obstacle: null,
+    }];
+  }, [savedTasks]);
 
   useEffect(() => {
     if (!notice) return;
@@ -520,6 +548,7 @@ const openNewTask = async (time?: string | number) => {
         onChangeDate={setSelectedDate}
         onAddTask={(time) => openNewTask(time)}
         savedTasks={savedTasks}
+        previousDayTasks={previousDayTasks}
         onEditTask={(task) => {
           if (readOnly) return;
           setNotice("");
@@ -645,6 +674,12 @@ function toWorkStatus(name: string): WorkStatus {
   if (normalized.includes("selesai") || normalized.includes("complete")) return "SELESAI";
   if (normalized.includes("tertahan") || normalized.includes("blocked") || normalized.includes("hold")) return "TERTAHAN";
   return "BERJALAN";
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
 }
 
 function formatDate(date: Date) {
