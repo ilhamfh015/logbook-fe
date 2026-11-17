@@ -8,6 +8,7 @@ import { SubmitHintDialog, type SubmitHintItem } from "@/components/shared/Submi
 import { TaskForm, type TaskFormField } from "@/components/task/TaskForm";
 import { ApiError } from "@/services/apiClient";
 import { logger } from "@/lib/logger";
+import { settingsService } from "@/services/settingsService";
 import {
   taskService,
   type ContinueTask,
@@ -70,7 +71,10 @@ export function TaskShowcase() {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [alertDialog, setAlertDialog] = useState<AlertDialogState | null>(null);
   const requestId = useRef(0);
-  const todayKey = formatDate(new Date());
+  const [serverToday, setServerToday] = useState<string | null>(null);
+  // Hari aktif mengikuti server agar shift malam yang melewati tengah malam
+  // tetap dapat mengisi Daily Log tanggal mulai shift.
+  const todayKey = serverToday ?? formatDate(new Date());
   const selectedDateKey = formatDate(selectedDate);
   const isPastDate = selectedDateKey < todayKey;
   const isFutureDate = selectedDateKey > todayKey;
@@ -177,12 +181,31 @@ export function TaskShowcase() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([taskService.getProjects(), taskService.getMasterData()])
-      .then(([availableProjects, availableMasterData]) => {
+    // Pengaturan dimuat bersama data awal agar hari aktif server sudah diketahui
+    // sebelum Daily Log pertama dimuat. Kegagalan pengaturan tidak menghalangi
+    // halaman: tanggal browser dipakai sebagai cadangan.
+    const settingsPromise = settingsService.getSettings().catch((error: unknown) => {
+      logger.warn("Gagal memuat pengaturan jam kerja", { message: getErrorMessage(error) });
+      return null;
+    });
+    Promise.all([taskService.getProjects(), taskService.getMasterData(), settingsPromise])
+      .then(([availableProjects, availableMasterData, settings]) => {
         if (!active) return;
         setProjects(availableProjects);
         setMasterData(availableMasterData);
         setLookupError("");
+
+        const activeDate = settings?.activeDate ?? null;
+        if (activeDate) {
+          setServerToday(activeDate);
+          // Bila pengguna belum berpindah tanggal, buka langsung pada hari aktif
+          // server (mis. shift malam setelah tengah malam).
+          setSelectedDate((current) =>
+            formatDate(current) === formatDate(new Date())
+              ? parseDateKey(activeDate)
+              : current
+          );
+        }
       })
       .catch((error: unknown) => {
         if (active) {
@@ -687,6 +710,11 @@ function formatDate(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
 }
 
 function getErrorMessage(error: unknown) {
