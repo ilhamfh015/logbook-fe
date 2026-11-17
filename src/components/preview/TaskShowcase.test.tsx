@@ -2,7 +2,15 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskShowcase } from "@/components/preview/TaskShowcase";
+import { ApiError } from "@/services/apiClient";
+import { settingsService } from "@/services/settingsService";
 import { taskService, type DailyLog } from "@/services/taskService";
+
+vi.mock("@/services/settingsService", () => ({
+  settingsService: {
+    getSettings: vi.fn(),
+  },
+}));
 
 vi.mock("@/services/taskService", () => ({
   taskService: {
@@ -22,6 +30,7 @@ vi.mock("@/services/taskService", () => ({
 }));
 
 const mocked = vi.mocked(taskService);
+const mockedSettings = vi.mocked(settingsService);
 
 const draftDailyLog: DailyLog = {
   id: 55,
@@ -64,29 +73,37 @@ async function renderShowcase() {
   return user;
 }
 
-describe("TaskShowcase submit hints", () => {
-  beforeEach(() => {
-    mocked.getProjects.mockResolvedValue([
-      { project_id: 1, project_name: "Alpha", client_name: "Client A", color: "blue" },
-    ]);
-    mocked.getMasterData.mockResolvedValue({
-      types: [{ id: 2, name: "Development" }],
-      statuses: [{ id: 3, name: "Berjalan" }],
-      durations: [{ minutes: 60, label: "1 j" }],
-    });
-    mocked.getContinueTasks.mockResolvedValue([]);
-    mocked.getCalendar.mockResolvedValue([
-      { date: "2026-11-17", holidayName: null, onLeave: false, weekend: false, workingDay: true },
-    ]);
-    mocked.getDailyLog.mockResolvedValue(draftDailyLog);
-    mocked.checkSubmit.mockResolvedValue({ hints: [] });
-    mocked.submitDailyLog.mockResolvedValue({
-      ...draftDailyLog,
-      status: "MENUNGGU",
-      submittedAt: "2026-11-17T09:00:00+07:00",
-      editable: false,
-    });
+function setupDefaultMocks() {
+  mocked.getProjects.mockResolvedValue([
+    { project_id: 1, project_name: "Alpha", client_name: "Client A", color: "blue" },
+  ]);
+  mocked.getMasterData.mockResolvedValue({
+    types: [{ id: 2, name: "Development" }],
+    statuses: [{ id: 3, name: "Berjalan" }],
+    durations: [{ minutes: 60, label: "1 j" }],
   });
+  mocked.getContinueTasks.mockResolvedValue([]);
+  mocked.getCalendar.mockResolvedValue([
+    { date: "2026-11-17", holidayName: null, onLeave: false, weekend: false, workingDay: true },
+  ]);
+  mocked.getDailyLog.mockResolvedValue(draftDailyLog);
+  mocked.checkSubmit.mockResolvedValue({ hints: [] });
+  mocked.submitDailyLog.mockResolvedValue({
+    ...draftDailyLog,
+    status: "MENUNGGU",
+    submittedAt: "2026-11-17T09:00:00+07:00",
+    editable: false,
+  });
+  mockedSettings.getSettings.mockResolvedValue({
+    workStart: "08:00",
+    workEnd: "17:00",
+    onboarded: true,
+    activeDate: "2026-11-17",
+  });
+}
+
+describe("TaskShowcase submit hints", () => {
+  beforeEach(setupDefaultMocks);
 
   it("shows hints and does not send before the talent decides", async () => {
     mocked.checkSubmit.mockResolvedValue({ hints: [shortSummaryHint] });
@@ -151,3 +168,36 @@ describe("TaskShowcase submit hints", () => {
     expect(mocked.submitDailyLog).not.toHaveBeenCalled();
   });
 });
+
+describe("TaskShowcase hari aktif server", () => {
+  beforeEach(setupDefaultMocks);
+
+  it("opens the night-shift day and keeps it editable after midnight", async () => {
+    // Pukul 01.00 bagi pengguna shift malam 22.00-06.00 masih bagian shift
+    // tanggal kemarin, sehingga server mengirim activeDate kemarin.
+    const now = new Date();
+    const shiftKey = toDateKey(
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1),
+    );
+    mockedSettings.getSettings.mockResolvedValue({
+      workStart: "22:00",
+      workEnd: "06:00",
+      onboarded: true,
+      activeDate: shiftKey,
+    });
+    mocked.getDailyLog.mockRejectedValue(new ApiError(404, "Daily log tidak ditemukan"));
+
+    render(<TaskShowcase />);
+
+    await waitFor(() => expect(mocked.getDailyLog).toHaveBeenCalledWith(shiftKey));
+    expect(await screen.findByRole("button", { name: "+ Tambah task" })).toBeInTheDocument();
+    expect(screen.queryByText(/sudah lewat sehingga Daily Log terkunci/)).not.toBeInTheDocument();
+  });
+});
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
