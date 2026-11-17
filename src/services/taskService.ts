@@ -50,6 +50,19 @@ export type ContinueTask = {
   obstacle: string | null;
 };
 
+/**
+ * Saran sebelum pengiriman dari `POST .../submit?check=true` (LBK-KUA-02).
+ * `taskId` menunjuk task yang bersangkutan; saran tidak pernah menghalangi
+ * pengiriman.
+ */
+export type SubmitHint = {
+  taskId: number;
+  kind: "RINGKASAN_PENDEK" | "TASK_PANJANG";
+  message: string;
+};
+
+export type SubmitCheck = { hints: SubmitHint[] };
+
 export type DayInfo = {
   date: string;
   holidayName: string | null;
@@ -109,6 +122,11 @@ export const taskService = {
 
   submitDailyLog: (dailyLogId: number) =>
     apiFetch<DailyLog>(`/api/daily-logs/${dailyLogId}/submit`, {
+      method: "POST",
+    }),
+
+  checkSubmit: (dailyLogId: number) =>
+    apiFetch<SubmitCheck>(`/api/daily-logs/${dailyLogId}/submit?check=true`, {
       method: "POST",
     }),
 
