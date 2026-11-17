@@ -1,10 +1,18 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { ErrorNotice } from "@/components/shared/ErrorNotice";
 import { ProjectChip } from "@/components/shared/ProjectChip";
 import { StatusSegmented } from "@/components/shared/StatusSegmented";
 import { TaskTypePill } from "@/components/shared/TaskTypePill";
+import {
+  firstFieldWithError,
+  itemsFromFieldErrors,
+  mergeErrorItems,
+  orderErrorItems,
+  type ErrorItem,
+} from "@/lib/errorItems";
 import { logger } from "@/lib/logger";
 import { toMinutes } from "@/lib/taskTime";
 import type {
@@ -33,6 +41,46 @@ type TaskFormProps = {
   saving: boolean;
   formError?: string;
   fieldErrors?: Partial<Record<TaskFormField, string>>;
+  serverErrorItems?: ErrorItem[];
+  onSubmitAttempt?: () => void;
+};
+
+const fieldOrder: TaskFormField[] = ["project", "ticket", "startTime", "duration", "type", "summary", "status"];
+const fieldLabels: Record<TaskFormField, string> = {
+  project: "Proyek",
+  ticket: "Tiket",
+  startTime: "Mulai",
+  duration: "Durasi",
+  type: "Jenis task",
+  summary: "Ringkasan",
+  status: "Status",
+};
+const apiFieldMap: Record<string, TaskFormField> = {
+  projectId: "project",
+  ticket: "ticket",
+  startTime: "startTime",
+  durationMinutes: "duration",
+  taskTypeId: "type",
+  summary: "summary",
+  workStatusId: "status",
+};
+const fieldElementIds: Record<TaskFormField, string> = {
+  project: "task-project-field",
+  ticket: "task-ticket",
+  startTime: "task-start-time",
+  duration: "task-duration",
+  type: "task-type-field",
+  summary: "task-summary",
+  status: "task-status-field",
+};
+const fieldErrorIds: Record<TaskFormField, string> = {
+  project: "task-error-project",
+  ticket: "task-error-ticket",
+  startTime: "task-error-start-time",
+  duration: "task-error-duration",
+  type: "task-error-type",
+  summary: "task-error-summary-field",
+  status: "task-error-status",
 };
 
 const defaultDurations: DurationOption[] = [
@@ -59,7 +107,12 @@ export function TaskForm({
   saving,
   formError,
   fieldErrors = {},
+  serverErrorItems = [],
+  onSubmitAttempt,
 }: TaskFormProps) {
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [dismissedGeneralSignature, setDismissedGeneralSignature] = useState("");
+  const previousServerErrorSignature = useRef("");
   const [projectId, setProjectId] = useState("");
   const [typeId, setTypeId] = useState("");
   const [status, setStatus] = useState<WorkStatus>(initialTask?.workStatus ?? "BERJALAN");
@@ -90,8 +143,6 @@ export function TaskForm({
     || (Number.isFinite(durationMinutes) && startMinutes + durationMinutes > 17 * 60)
   );
 
-  // Dihitung dari isi form, bukan dari status submit: galat wajib sudah tampil
-  // begitu panel dibuka dan langsung hilang saat field diperbaiki.
   const validationErrors = loading
     ? {}
     : validateForm({
@@ -105,7 +156,71 @@ export function TaskForm({
         customDuration,
       });
 
-  const notifyFieldChange = (field: TaskFormField) => onFieldChange?.(field);
+  const localErrorItems = itemsFromFieldErrors(validationErrors, "form").map((item) => ({
+    ...item,
+    id: `local-${item.id}`,
+    message: `${fieldLabels[item.field as TaskFormField]}: ${item.message}`,
+  }));
+  const propFieldErrorItems = itemsFromFieldErrors(
+    Object.fromEntries(Object.entries(fieldErrors)),
+    "server",
+  ).map((item) => withFieldLabel(
+    { ...item, id: `prop-${item.id}` },
+    item.field ? normalizeFormField(item.field) : undefined,
+  ));
+  const passedServerErrorItems = serverErrorItems.map((item) => {
+    const field = item.field ? normalizeFormField(item.field) : undefined;
+    return withFieldLabel({ ...item, id: `server-${item.id}` }, field);
+  });
+  const externalErrorItems = orderErrorItems(
+    mergeErrorItems(
+      propFieldErrorItems,
+      passedServerErrorItems,
+      formError ? [{ id: "error-form", message: formError, source: "server" }] : [],
+    ),
+    fieldOrder,
+  );
+  const generalErrorSignature = JSON.stringify(
+    externalErrorItems.filter((item) => !item.field).map((item) => [item.id, item.message]),
+  );
+  const generalErrorsDismissed = generalErrorSignature !== "[]"
+    && dismissedGeneralSignature === generalErrorSignature;
+  const visibleExternalItems = generalErrorsDismissed
+    ? externalErrorItems.filter((item) => item.field)
+    : externalErrorItems;
+  const showSummary = hasSubmitted || externalErrorItems.length > 0;
+  const summaryItems = showSummary
+    ? orderErrorItems(mergeErrorItems(localErrorItems, visibleExternalItems), fieldOrder)
+    : [];
+
+  const focusField = (field: string) => {
+    document.getElementById(fieldElementIds[normalizeFormField(field) ?? "project"])?.focus();
+  };
+  const focusFirstError = (items: ErrorItem[]) => {
+    const firstField = firstFieldWithError(items, fieldOrder);
+    if (firstField) focusField(firstField);
+    else document.getElementById("task-error-summary")?.focus();
+  };
+
+  const serverErrorSignature = JSON.stringify(externalErrorItems);
+  const firstServerErrorField = firstFieldWithError(summaryItems, fieldOrder) as TaskFormField | null;
+  const serverErrorFocusTarget: TaskFormField | "summary" | null = externalErrorItems.length > 0
+    ? firstServerErrorField ?? "summary"
+    : null;
+  useEffect(() => {
+    if (serverErrorSignature === previousServerErrorSignature.current) return;
+    previousServerErrorSignature.current = serverErrorSignature;
+    if (!serverErrorFocusTarget) return;
+    const elementId = serverErrorFocusTarget === "summary"
+      ? "task-error-summary"
+      : fieldElementIds[serverErrorFocusTarget];
+    document.getElementById(elementId)?.focus();
+  }, [serverErrorFocusTarget, serverErrorSignature]);
+
+  const notifyFieldChange = (field: TaskFormField) => {
+    onFieldChange?.(field);
+    if (generalErrorSignature !== "[]") setDismissedGeneralSignature(generalErrorSignature);
+  };
 
   // Saran ini hanya relevan saat menambah task baru; saat mengubah task, isi
   // form sudah berasal dari task yang dipilih.
@@ -135,6 +250,9 @@ export function TaskForm({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setHasSubmitted(true);
+    onSubmitAttempt?.();
+    setDismissedGeneralSignature("");
     const errors = validateForm({
       projectSelected: Boolean(selectedProject),
       typeSelected: Boolean(selectedType),
@@ -159,6 +277,11 @@ export function TaskForm({
         fields: Object.keys(errors).join(",") || "task",
       });
       for (const field of Object.keys(errors) as TaskFormField[]) notifyFieldChange(field);
+      const currentLocalItems = itemsFromFieldErrors(errors, "form").map((item) => ({
+        ...item,
+        message: `${fieldLabels[item.field as TaskFormField]}: ${item.message}`,
+      }));
+      focusFirstError(orderErrorItems(mergeErrorItems(currentLocalItems, visibleExternalItems), fieldOrder));
       return;
     }
 
@@ -181,10 +304,22 @@ export function TaskForm({
 
   const showError = (field: TaskFormField) => {
     const message = fieldErrors[field] ?? validationErrors[field];
-    return message ? <p className="mt-1 text-xs font-medium text-red-600" role="alert">{message}</p> : null;
+    const externalHasError = visibleExternalItems.some((item) => item.field === field);
+    if (!message && !externalHasError) return null;
+    return (
+      <p id={fieldErrorIds[field]} className="mt-1 text-xs font-medium text-red-600" role="status">
+        {showSummary ? (
+          <>
+            Perlu diperbaiki.<span className="sr-only">{message}</span>
+          </>
+        ) : message}
+      </p>
+    );
   };
 
-  const hasError = (field: TaskFormField) => Boolean(fieldErrors[field] ?? validationErrors[field]);
+  const hasError = (field: TaskFormField) => Boolean(
+    fieldErrors[field] ?? validationErrors[field] ?? visibleExternalItems.some((item) => item.field === field),
+  );
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit} noValidate>
@@ -218,10 +353,16 @@ export function TaskForm({
           })}
         </section>
       ) : null}
-      {formError ? <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{formError}</p> : null}
+      {summaryItems.length > 0 ? (
+        <ErrorNotice
+          id="task-error-summary"
+          items={summaryItems}
+          onSelectField={focusField}
+        />
+      ) : null}
       {loading ? <p className="text-sm text-slate-500" role="status">Memuat pilihan task...</p> : null}
 
-      <fieldset disabled={loading || blocked || saving} aria-invalid={hasError("project")} className={`disabled:opacity-70 ${hasError("project") ? "rounded-lg border border-red-500 p-3" : ""}`}>
+      <fieldset id={fieldElementIds.project} tabIndex={-1} disabled={loading || blocked || saving} aria-invalid={hasError("project")} aria-describedby={hasError("project") ? fieldErrorIds.project : undefined} className={`disabled:opacity-70 ${hasError("project") ? "rounded-lg border border-red-500 p-3" : ""}`}>
         <legend className="mb-2 text-sm font-semibold text-ink">Proyek <span className="text-brand">*</span></legend>
         <div className="flex flex-wrap gap-2">
           {projects.map((item) => (
@@ -241,17 +382,17 @@ export function TaskForm({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         <label className="col-span-2 sm:col-span-1">
           <span className="mb-2 block text-sm font-semibold">Tiket <span className="font-normal text-slate-400">(opsional)</span></span>
-          <input name="ticket" className={`field-control ${hasError("ticket") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} placeholder="ABC-153" value={ticket} aria-invalid={hasError("ticket")} onChange={(event) => { setTicket(event.currentTarget.value); notifyFieldChange("ticket"); }} />
+          <input id={fieldElementIds.ticket} name="ticket" className={`field-control ${hasError("ticket") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} placeholder="ABC-153" value={ticket} aria-invalid={hasError("ticket")} aria-describedby={hasError("ticket") ? fieldErrorIds.ticket : undefined} onChange={(event) => { setTicket(event.currentTarget.value); notifyFieldChange("ticket"); }} />
           {showError("ticket")}
         </label>
         <label>
           <span className="mb-2 block text-sm font-semibold">Mulai <span className="text-brand">*</span></span>
-          <input name="startTime" className={`field-control ${hasError("startTime") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} type="time" value={startTime} required aria-invalid={hasError("startTime")} onChange={(event) => { setStartTime(event.currentTarget.value); notifyFieldChange("startTime"); }} />
+          <input id={fieldElementIds.startTime} name="startTime" className={`field-control ${hasError("startTime") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} type="time" value={startTime} required aria-invalid={hasError("startTime")} aria-describedby={hasError("startTime") ? fieldErrorIds.startTime : undefined} onChange={(event) => { setStartTime(event.currentTarget.value); notifyFieldChange("startTime"); }} />
           {showError("startTime")}
         </label>
         <label>
           <span className="mb-2 block text-sm font-semibold">Durasi <span className="text-brand">*</span></span>
-          <select name="duration" className={`field-control ${hasError("duration") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} value={selectedDuration} onChange={(event) => { setDuration(event.target.value); notifyFieldChange("duration"); }} aria-invalid={hasError("duration")}>
+          <select id={fieldElementIds.duration} name="duration" className={`field-control ${hasError("duration") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} value={selectedDuration} onChange={(event) => { setDuration(event.target.value); notifyFieldChange("duration"); }} aria-invalid={hasError("duration")} aria-describedby={hasError("duration") ? fieldErrorIds.duration : undefined}>
             <option value="">Pilih durasi</option>
             {(durations.length ? durations : defaultDurations).map((item) => <option key={item.minutes} value={item.minutes}>{item.label}</option>)}
             <option value="other">Lainnya</option>
@@ -267,7 +408,7 @@ export function TaskForm({
       {selectedDuration === "other" ? (
         <label className="block">
           <span className="mb-2 block text-sm font-semibold">Durasi (menit)</span>
-          <input className={`field-control max-w-40 ${hasError("duration") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} type="number" min="5" max="1440" step="5" value={customDuration} onChange={(event) => { setCustomDuration(event.target.value); notifyFieldChange("duration"); }} required aria-invalid={hasError("duration")} />
+          <input id="task-duration-custom" className={`field-control max-w-40 ${hasError("duration") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} type="number" min="5" max="1440" step="5" value={customDuration} onChange={(event) => { setCustomDuration(event.target.value); notifyFieldChange("duration"); }} required aria-invalid={hasError("duration")} aria-describedby={hasError("duration") ? fieldErrorIds.duration : undefined} />
           {showError("duration")}
         </label>
       ) : null}
@@ -275,6 +416,9 @@ export function TaskForm({
       <fieldset
         disabled={loading || blocked || saving}
         aria-invalid={hasError("type")}
+        id={fieldElementIds.type}
+        tabIndex={-1}
+        aria-describedby={hasError("type") ? fieldErrorIds.type : undefined}
         className={`disabled:opacity-70 ${hasError("type") ? "rounded-lg border border-red-500 p-3" : ""}`}
       >
         <legend className="mb-2 text-sm font-semibold">Jenis task <span className="text-brand">*</span></legend>
@@ -289,7 +433,7 @@ export function TaskForm({
       <div>
         <label htmlFor="task-summary" className="mb-2 block text-sm font-semibold">Ringkasan dan hasil <span className="text-brand">*</span></label>
         <div className="relative">
-          <textarea id="task-summary" name="summary" className={`field-control min-h-24 resize-y pb-7 ${hasError("summary") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} placeholder="Apa yang dikerjakan, hasilnya, buktinya." maxLength={500} value={summary} onChange={(event) => { setSummary(event.currentTarget.value); notifyFieldChange("summary"); }} required aria-invalid={hasError("summary")} />
+          <textarea id={fieldElementIds.summary} name="summary" className={`field-control min-h-24 resize-y pb-7 ${hasError("summary") ? "border-red-500 focus:border-red-600 focus:ring-red-100" : ""}`} placeholder="Apa yang dikerjakan, hasilnya, buktinya." maxLength={500} value={summary} onChange={(event) => { setSummary(event.currentTarget.value); notifyFieldChange("summary"); }} required aria-invalid={hasError("summary")} aria-describedby={hasError("summary") ? fieldErrorIds.summary : undefined} />
           <span className="absolute bottom-2 right-3 text-xs text-slate-400">{summary.length}/500</span>
         </div>
         {showError("summary")}
@@ -308,7 +452,7 @@ export function TaskForm({
         />
       </div>
 
-      <fieldset disabled={loading || blocked || saving}>
+      <fieldset id={fieldElementIds.status} tabIndex={-1} disabled={loading || blocked || saving} aria-invalid={hasError("status")} aria-describedby={hasError("status") ? fieldErrorIds.status : undefined}>
         <legend className="mb-2 text-sm font-semibold">Status <span className="text-brand">*</span></legend>
           <StatusSegmented value={status} onChange={(value) => { setStatus(value); notifyFieldChange("status"); }} />
         {showError("status")}
@@ -409,4 +553,19 @@ function validateDuration(selection: string, customDuration: string) {
     return "Durasi harus antara 5 dan 1440 menit.";
   }
   return undefined;
+}
+
+function normalizeFormField(field: string): TaskFormField | undefined {
+  if (fieldOrder.includes(field as TaskFormField)) return field as TaskFormField;
+  return apiFieldMap[field];
+}
+
+function withFieldLabel(item: ErrorItem, field: TaskFormField | undefined): ErrorItem {
+  if (!field) return { ...item, field: undefined };
+  const label = `${fieldLabels[field]}: `;
+  return {
+    ...item,
+    field,
+    message: item.message.startsWith(label) ? item.message : `${label}${item.message}`,
+  };
 }

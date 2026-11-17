@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { TaskForm } from "@/components/task/TaskForm";
@@ -171,5 +171,102 @@ describe("TaskForm", () => {
     });
 
     expect(screen.queryByLabelText("Lanjutkan pekerjaan")).not.toBeInTheDocument();
+  });
+
+  it("shows all local errors in field order, blocks saving, and focuses the first field", async () => {
+    const { user, onSave } = renderTaskForm();
+
+    await user.click(screen.getByRole("button", { name: "Simpan task" }));
+
+    const summary = screen.getByRole("alert");
+    expect(within(summary).getAllByRole("button").map((item) => item.textContent)).toEqual([
+      "Proyek: Proyek wajib dipilih.",
+      "Durasi: Durasi wajib dipilih.",
+      "Jenis task: Pilih jenis task yang tersedia.",
+      "Ringkasan: Ringkasan wajib diisi.",
+    ]);
+    expect(onSave).not.toHaveBeenCalled();
+    expect(document.activeElement).toHaveAttribute("id", "task-project-field");
+  });
+
+  it("keeps the after-hours warning out of the error summary", async () => {
+    const { user, onSave } = renderTaskForm();
+    fireEvent.change(screen.getByLabelText(/Mulai/), {
+      target: { value: "18:00" },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Simpan task" }));
+
+    expect(screen.getByText(/di luar jam kerja normal/)).toBeInTheDocument();
+    const summary = screen.getByRole("alert");
+    expect(within(summary).queryByText(/di luar jam kerja normal/)).not.toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("focuses the matching field when a summary item is selected", async () => {
+    const { user } = renderTaskForm();
+
+    await user.click(screen.getByRole("button", { name: "Simpan task" }));
+    await user.click(screen.getByRole("button", { name: "Ringkasan: Ringkasan wajib diisi." }));
+
+    expect(document.activeElement).toHaveAttribute("id", "task-summary");
+  });
+
+  it("removes a field error from the summary after that field changes", async () => {
+    const { user } = renderTaskForm();
+
+    await user.click(screen.getByRole("button", { name: "Simpan task" }));
+    await user.click(screen.getByRole("button", { name: "Alpha" }));
+
+    expect(screen.queryByRole("button", { name: "Proyek: Proyek wajib dipilih." })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Durasi: Durasi wajib dipilih." })).toBeInTheDocument();
+  });
+
+  it("maps backend field keys to Indonesian labels and focuses the first field", async () => {
+    renderTaskForm(undefined, {
+      serverErrorItems: [
+        { id: "error-summary", field: "summary", message: "Ringkasan: Perlu diperiksa.", source: "server" },
+        { id: "error-projectId", field: "projectId", message: "Proyek: Proyek tidak tersedia.", source: "server" },
+      ],
+    });
+
+    expect(await screen.findByRole("button", { name: "Proyek: Proyek tidak tersedia." })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ringkasan: Perlu diperiksa." })).toBeInTheDocument();
+    expect(document.activeElement).toHaveAttribute("id", "task-project-field");
+  });
+
+  it("keeps an unknown backend key as a general error and focuses the summary", async () => {
+    renderTaskForm(undefined, {
+      initialTask: {
+        id: "7",
+        projectId: 1,
+        taskTypeId: 2,
+        workStatusId: 3,
+        project: "Alpha",
+        projectColor: "blue",
+        ticket: "ABC-142",
+        startTime: "08:00",
+        durationMinutes: 60,
+        type: "Development",
+        summary: "Pekerjaan selesai.",
+        obstacle: "",
+        workStatus: "BERJALAN",
+      },
+      serverErrorItems: [
+        { id: "error-unexpectedField", field: "unexpectedField", message: "Data belum dapat diproses.", source: "server" },
+      ],
+    });
+
+    expect(await screen.findByText("Data belum dapat diproses.")).toBeInTheDocument();
+    expect(document.activeElement).toHaveAttribute("id", "task-error-summary");
+    expect(screen.queryByRole("button", { name: "Data belum dapat diproses." })).not.toBeInTheDocument();
+  });
+
+  it("uses the shared red palette for the error summary", async () => {
+    const { user } = renderTaskForm();
+
+    await user.click(screen.getByRole("button", { name: "Simpan task" }));
+
+    expect(screen.getByRole("alert")).toHaveClass("border-red-200", "bg-red-50", "text-red-700");
   });
 });

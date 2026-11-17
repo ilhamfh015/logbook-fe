@@ -41,15 +41,16 @@ describe("ErrorNotice", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("exposes an assertive alert and avoids red, rose, and pink classes", () => {
+  it("exposes an assertive alert with the shared red error palette", () => {
     const { container } = render(<ErrorNotice items={items} />);
     const alert = screen.getByRole("alert");
 
     expect(alert).toHaveAttribute("aria-live", "assertive");
     expect(alert).toHaveAttribute("tabindex", "-1");
-    for (const element of container.querySelectorAll("*")) {
-      expect(element.getAttribute("class") ?? "").not.toMatch(/\b(?:red|rose|pink)-/);
-    }
+    expect(alert).toHaveClass("border-red-200", "bg-red-50", "text-red-700");
+    expect(container.querySelector("svg")).toHaveClass("text-red-700");
+    expect(screen.getByRole("heading")).toHaveClass("text-red-700");
+    expect(screen.getByRole("list")).toHaveClass("text-red-700");
   });
 
   it("shows only the first message in banner variant", () => {
