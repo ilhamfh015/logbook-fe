@@ -4,7 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import { TaskForm } from "@/components/task/TaskForm";
 import type { TaskDraft } from "@/types/task";
 
-function renderTaskForm(onSave: (task: TaskDraft) => Promise<void> = vi.fn(async () => undefined)) {
+type TaskFormProps = Parameters<typeof TaskForm>[0];
+
+function renderTaskForm(
+  onSave: (task: TaskDraft) => Promise<void> = vi.fn(async () => undefined),
+  props: Partial<TaskFormProps> = {},
+) {
   const user = userEvent.setup();
   const onCancel = vi.fn();
 
@@ -23,6 +28,7 @@ function renderTaskForm(onSave: (task: TaskDraft) => Promise<void> = vi.fn(async
       ]}
       loading={false}
       saving={false}
+      {...props}
     />,
   );
 
@@ -100,5 +106,70 @@ describe("TaskForm", () => {
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({ startTime: "18:00", durationMinutes: 60 }),
     );
+  });
+
+  it("fills project, ticket, and type from a continue suggestion", async () => {
+    const { user } = renderTaskForm(undefined, {
+      continueTasks: [
+        {
+          id: 14,
+          project: "Alpha",
+          color: "#1565C0",
+          ticket: "ABC-142",
+          startMinute: 480,
+          durationMinutes: 60,
+          type: "Development",
+          summary: "Validasi form pendaftaran.",
+          workStatus: "Berjalan",
+          obstacle: null,
+        },
+      ],
+    });
+
+    expect(screen.getByLabelText("Lanjutkan pekerjaan")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Lanjutkan ABC-142" }));
+
+    expect(screen.getByRole("textbox", { name: /Tiket/ })).toHaveValue("ABC-142");
+    expect(screen.getByRole("button", { name: "Alpha" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Development" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("hides continue suggestions while editing an existing task", () => {
+    renderTaskForm(undefined, {
+      initialTask: {
+        id: "7",
+        projectId: 1,
+        taskTypeId: 2,
+        workStatusId: 3,
+        project: "Alpha",
+        projectColor: "blue",
+        ticket: "ABC-142",
+        startTime: "08:00",
+        durationMinutes: 60,
+        type: "Development",
+        summary: "Melanjutkan pekerjaan.",
+        obstacle: "",
+        workStatus: "BERJALAN",
+      },
+      continueTasks: [
+        {
+          id: 14,
+          project: "Alpha",
+          color: "#1565C0",
+          ticket: "ABC-142",
+          startMinute: 480,
+          durationMinutes: 60,
+          type: "Development",
+          summary: "Validasi form pendaftaran.",
+          workStatus: "Berjalan",
+          obstacle: null,
+        },
+      ],
+    });
+
+    expect(screen.queryByLabelText("Lanjutkan pekerjaan")).not.toBeInTheDocument();
   });
 });

@@ -10,6 +10,7 @@ import { nextStartTime } from "@/lib/taskTime";
 import { logger } from "@/lib/logger";
 import {
   taskService,
+  type ContinueTask,
   type DailyLog,
   type DayInfo,
   type ProjectOption,
@@ -50,6 +51,7 @@ export function TaskShowcase() {
   const [submittingDailyLog, setSubmittingDailyLog] = useState(false);
   const [withdrawingDailyLog, setWithdrawingDailyLog] = useState(false);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [continueTasks, setContinueTasks] = useState<ContinueTask[]>([]);
   const [masterData, setMasterData] = useState(initialMasterData);
   const [lookupLoading, setLookupLoading] = useState(true);
   const [lookupError, setLookupError] = useState("");
@@ -186,6 +188,21 @@ export function TaskShowcase() {
       window.clearTimeout(timer);
     };
   }, [loadDailyLog, lookupError, lookupLoading]);
+
+  useEffect(() => {
+    let active = true;
+    taskService.getContinueTasks()
+      .then((tasks) => {
+        if (active) setContinueTasks(tasks);
+      })
+      .catch((error: unknown) => {
+        // Saran bersifat tambahan: kegagalannya tidak boleh menghalangi form.
+        if (active) {
+          logger.warn("Gagal memuat saran lanjutkan", { message: getErrorMessage(error) });
+        }
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!notice) return;
@@ -484,6 +501,7 @@ export function TaskShowcase() {
           key={editingTask?.id ?? `new-task-${startTime}`}
           initialTask={editingTask}
           initialStartTime={startTime}
+          continueTasks={editingTask ? [] : continueTasks}
           onCancel={() => { setPanelOpen(false); setEditingTask(null); }}
           onSave={saveTask}
           onFieldChange={(field) => setFieldErrors((current) => {
