@@ -8,6 +8,7 @@ const LOG_ENDPOINT = "/logbook-log";
 const LEVEL_ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 const DUPLICATE_WINDOW_MS = 5_000;
 const RATE_WINDOW_MS = 60_000;
+const DUPLICATE_STATE_TTL_MS = 60_000;
 const MAX_SENDS_PER_WINDOW = 30;
 const duplicateStates = new Map<string, { lastSentAt: number; suppressed: number }>();
 const sendTimes: number[] = [];
@@ -68,10 +69,17 @@ function transport(payload: LogPayload) {
 }
 
 function isDuplicate(payload: LogPayload, now: number) {
+  for (const [key, state] of duplicateStates) {
+    if (now - state.lastSentAt > DUPLICATE_STATE_TTL_MS) duplicateStates.delete(key);
+  }
+
   const errorMessage = typeof payload.context.errorMessage === "string"
     ? payload.context.errorMessage
     : "";
-  const key = JSON.stringify([payload.level, payload.event, errorMessage]);
+  const path = typeof payload.context.path === "string" ? stripQuery(payload.context.path) : "";
+  const method = payload.context.method ?? "";
+  const status = payload.context.status ?? "";
+  const key = JSON.stringify([payload.level, payload.event, errorMessage, path, method, status]);
   const state = duplicateStates.get(key);
   if (state && now - state.lastSentAt < DUPLICATE_WINDOW_MS) {
     state.suppressed += 1;
