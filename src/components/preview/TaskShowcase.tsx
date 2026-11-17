@@ -4,15 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TimelinePreview, dailyLogStatusLabel } from "@/components/preview/TimelinePreview";
 import { Dialog } from "@/components/shared/Dialog";
 import { SidePanel } from "@/components/shared/SidePanel";
+import { SubmitHintDialog, type SubmitHintItem } from "@/components/shared/SubmitHintDialog";
 import { TaskForm, type TaskFormField } from "@/components/task/TaskForm";
 import { ApiError } from "@/services/apiClient";
-import { nextStartTime } from "@/lib/taskTime";
 import { logger } from "@/lib/logger";
 import {
   taskService,
+  type ContinueTask,
   type DailyLog,
   type DayInfo,
   type ProjectOption,
+  type SubmitHint,
   type TaskMasterData,
 } from "@/services/taskService";
 import type { TaskDraft as TaskFormDraft, WorkStatus } from "@/types/task";
@@ -48,8 +50,15 @@ export function TaskShowcase() {
   const [dailyLogLoading, setDailyLogLoading] = useState(true);
   const [dayInfo, setDayInfo] = useState<DayInfo | null>(null);
   const [submittingDailyLog, setSubmittingDailyLog] = useState(false);
+  const [checkingHints, setCheckingHints] = useState(false);
+  const [hintDialog, setHintDialog] = useState<{
+    id: number;
+    isResubmit: boolean;
+    hints: SubmitHintItem[];
+  } | null>(null);
   const [withdrawingDailyLog, setWithdrawingDailyLog] = useState(false);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [continueTasks, setContinueTasks] = useState<ContinueTask[]>([]);
   const [masterData, setMasterData] = useState(initialMasterData);
   const [lookupLoading, setLookupLoading] = useState(true);
   const [lookupError, setLookupError] = useState("");
@@ -188,17 +197,45 @@ export function TaskShowcase() {
   }, [loadDailyLog, lookupError, lookupLoading]);
 
   useEffect(() => {
+    let active = true;
+    taskService.getContinueTasks()
+      .then((tasks) => {
+        if (active) setContinueTasks(tasks);
+      })
+      .catch((error: unknown) => {
+        // Saran bersifat tambahan: kegagalannya tidak boleh menghalangi form.
+        if (active) {
+          logger.warn("Gagal memuat saran lanjutkan", { message: getErrorMessage(error) });
+        }
+      });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(""), 5000);
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const openNewTask = async (time?: string) => {
+  const formatTimeFromMinute = (minute: number) => {
+  const h = Math.floor(minute / 60).toString().padStart(2, "0");
+  const m = (minute % 60).toString().padStart(2, "0");
+  return `${h}:${m}`;
+};
+
+const openNewTask = async (time?: string | number) => {
     setNotice("");
     setFormError("");
     setFieldErrors({});
     setEditingTask(null);
-    const suggestedStartTime = time ?? nextStartTime(savedTasks);
+    let minute: number | undefined;
+    if (typeof time === "number") {
+      minute = time;
+    } else if (time) {
+      const parsed = Number(time);
+      if (Number.isFinite(parsed)) minute = parsed;
+    }
+    const suggestedStartTime = minute != null ? formatTimeFromMinute(minute) : "08:00";
     setStartTime(suggestedStartTime);
     logger.info("Membuka form task baru", {
       date: formatDate(selectedDate),
@@ -374,19 +411,7 @@ export function TaskShowcase() {
     }
   };
 
-  const submitDailyLog = () => {
-    if (readOnly || dailyLogId === null || savedTasks.length === 0 || submittingDailyLog) {
-      return;
-    }
-
-    if (dailyLogStatus !== "DRAF" && dailyLogStatus !== "DITOLAK") {
-      setNotice("Daily Log tidak dapat dikirim pada status saat ini.");
-      setNoticeIsError(true);
-      return;
-    }
-
-    const isResubmit = dailyLogStatus === "DITOLAK";
-    const id = dailyLogId;
+  const confirmSubmitDailyLog = (id: number, isResubmit: boolean) => {
     setConfirmDialog({
       title: isResubmit ? "Kirim ulang Daily Log?" : "Kirim Daily Log?",
       description: isResubmit
@@ -398,6 +423,54 @@ export function TaskShowcase() {
         void performSubmitDailyLog(id, isResubmit);
       },
     });
+  };
+
+  const submitDailyLog = async () => {
+    if (
+      readOnly
+      || dailyLogId === null
+      || savedTasks.length === 0
+      || submittingDailyLog
+      || checkingHints
+    ) {
+      return;
+    }
+
+    if (dailyLogStatus !== "DRAF" && dailyLogStatus !== "DITOLAK") {
+      setNotice("Daily Log tidak dapat dikirim pada status saat ini.");
+      setNoticeIsError(true);
+      return;
+    }
+
+    const isResubmit = dailyLogStatus === "DITOLAK";
+    const id = dailyLogId;
+
+    // LBK-KUA-02: tampilkan saran sebelum pengiriman. Kegagalan pemeriksaan
+    // tidak boleh menghalangi talent mengirim Daily Log.
+    setCheckingHints(true);
+    try {
+      const check = await taskService.checkSubmit(id);
+      if (check.hints.length > 0) {
+        setHintDialog({ id, isResubmit, hints: withTickets(check.hints, savedTasks) });
+        return;
+      }
+    } catch (error) {
+      logger.warn("Gagal memeriksa saran sebelum kirim", {
+        dailyLogId: id,
+        message: getErrorMessage(error),
+      });
+    } finally {
+      setCheckingHints(false);
+    }
+
+    confirmSubmitDailyLog(id, isResubmit);
+  };
+
+  const sendDespiteHints = () => {
+    if (!hintDialog) return;
+    const { id, isResubmit } = hintDialog;
+    setHintDialog(null);
+    void performSubmitDailyLog(id, isResubmit);
   };
 
   const performWithdrawDailyLog = async (id: number) => {
@@ -468,7 +541,7 @@ export function TaskShowcase() {
         rejectionReason={dailyLogRejectionReason}
         canWithdraw={canWithdraw}
         canSubmit={savedTasks.length > 0}
-        submitting={submittingDailyLog}
+        submitting={submittingDailyLog || checkingHints}
         onSubmit={submitDailyLog}
         withdrawing={withdrawingDailyLog}
         onWithdraw={withdrawDailyLog}
@@ -484,6 +557,7 @@ export function TaskShowcase() {
           key={editingTask?.id ?? `new-task-${startTime}`}
           initialTask={editingTask}
           initialStartTime={startTime}
+          continueTasks={editingTask ? [] : continueTasks}
           onCancel={() => { setPanelOpen(false); setEditingTask(null); }}
           onSave={saveTask}
           onFieldChange={(field) => setFieldErrors((current) => {
@@ -524,8 +598,25 @@ export function TaskShowcase() {
       >
         {alertDialog?.message}
       </Dialog>
+      <SubmitHintDialog
+        open={hintDialog !== null}
+        hints={hintDialog?.hints ?? []}
+        onFix={() => setHintDialog(null)}
+        onSendAnyway={sendDespiteHints}
+      />
     </div>
   );
+}
+
+/**
+ * Melengkapi saran dengan tiket task yang sedang tampil supaya talent langsung
+ * mengenali task yang dimaksud.
+ */
+function withTickets(hints: SubmitHint[], tasks: TaskFormDraft[]): SubmitHintItem[] {
+  return hints.map((hint) => ({
+    ...hint,
+    ticket: tasks.find((task) => Number(task.id) === hint.taskId)?.ticket || null,
+  }));
 }
 
 function toTaskDraft(task: DailyLog["tasks"][number], projects: ProjectOption[], masterData: TaskMasterData): TaskFormDraft {

@@ -1,4 +1,5 @@
 import { apiFetch } from "@/services/apiClient";
+import { resolveStartMinute } from "@/lib/taskTime";
 import type { TaskDraft } from "@/types/task";
 
 export type ProjectOption = {
@@ -25,10 +26,42 @@ export type ApiTask = {
   workStatusId: number;
   ticket: string | null;
   startTime: string;
+  startMinute: number;
   durationMinutes: number;
   summary: string;
   obstacle: string | null;
 };
+
+/**
+ * Saran "Lanjutkan" dari GET /api/continue: task Berjalan/Tertahan pada hari
+ * terakhir yang berisi catatan. Berbeda dari {@link ApiTask}, bentuk ini
+ * memakai nama (bukan id) karena dipakai untuk mengisi form.
+ */
+export type ContinueTask = {
+  id: number;
+  project: string | null;
+  color: string | null;
+  ticket: string | null;
+  startMinute: number | null;
+  durationMinutes: number;
+  type: string | null;
+  summary: string;
+  workStatus: string | null;
+  obstacle: string | null;
+};
+
+/**
+ * Saran sebelum pengiriman dari `POST .../submit?check=true` (LBK-KUA-02).
+ * `taskId` menunjuk task yang bersangkutan; saran tidak pernah menghalangi
+ * pengiriman.
+ */
+export type SubmitHint = {
+  taskId: number;
+  kind: "RINGKASAN_PENDEK" | "TASK_PANJANG";
+  message: string;
+};
+
+export type SubmitCheck = { hints: SubmitHint[] };
 
 export type DayInfo = {
   date: string;
@@ -60,6 +93,7 @@ type TaskRequest = {
   workStatusId: number;
   ticket: string | null;
   startTime: string;
+  startMinute: number;
   durationMinutes: number;
   summary: string;
   obstacle: string | null;
@@ -67,6 +101,8 @@ type TaskRequest = {
 
 export const taskService = {
   getProjects: () => apiFetch<ProjectOption[]>("/api/projects"),
+
+  getContinueTasks: () => apiFetch<ContinueTask[]>("/api/continue"),
 
   getMasterData: () => apiFetch<TaskMasterData>("/api/tasks/master-data"),
 
@@ -86,6 +122,11 @@ export const taskService = {
 
   submitDailyLog: (dailyLogId: number) =>
     apiFetch<DailyLog>(`/api/daily-logs/${dailyLogId}/submit`, {
+      method: "POST",
+    }),
+
+  checkSubmit: (dailyLogId: number) =>
+    apiFetch<SubmitCheck>(`/api/daily-logs/${dailyLogId}/submit?check=true`, {
       method: "POST",
     }),
 
@@ -125,6 +166,9 @@ function toTaskRequest(task: TaskDraft): TaskRequest {
     workStatusId: task.workStatusId,
     ticket: task.ticket || null,
     startTime: task.startTime,
+    // Backend menyimpan menit absolut sehingga task dini hari (00.00 - 08.00)
+    // tetap dihitung pada tanggal Daily Log-nya.
+    startMinute: resolveStartMinute(task),
     durationMinutes: task.durationMinutes,
     summary: task.summary,
     obstacle: task.obstacle?.trim() || null,

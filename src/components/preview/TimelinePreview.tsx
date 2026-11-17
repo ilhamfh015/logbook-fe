@@ -10,14 +10,16 @@ import {
   Plus,
 } from "lucide-react";
 import { ProjectChip } from "@/components/shared/ProjectChip";
-import { nextStartTime } from "@/lib/taskTime";
+import { buildDaySchedule, SLOT_MINUTES, type ScheduledTask, type TimelineSegment } from "@/lib/timeline";
+import {
+  formatClock,
+  formatHourLabel,
+  nextStartMinute,
+  resolveStartMinute,
+  WORKDAY_START_MINUTE,
+} from "@/lib/taskTime";
 import type { DayInfo } from "@/services/taskService";
 import type { ProjectColor, TaskDraft } from "@/types/task";
-
-const hourLabels = Array.from(
-  { length: 10 },
-  (_, index) => `${String(index + 8).padStart(2, "0")}.00`,
-);
 
 type TimelineTask = {
   id: string;
@@ -31,13 +33,17 @@ type TimelineTask = {
   badge?: string;
   sourceTask?: TaskDraft;
   persisted?: boolean;
+  spill?: boolean;
+  continuesNextDay?: boolean;
 };
 
 type TimelinePreviewProps = {
   date: Date;
   onChangeDate: (date: Date) => void;
-  onAddTask: (startTime?: string) => void;
+  onAddTask: (startMinute?: number) => void;
   savedTasks: TaskDraft[];
+  /** Task tanggal sebelumnya yang berlanjut melewati tengah malam (hanya untuk ditampilkan). */
+  previousDayTasks?: TaskDraft[];
   onEditTask: (task: TaskDraft) => void;
   onDeleteTask: (id: string) => void;
   loading: boolean;
@@ -63,6 +69,7 @@ export function TimelinePreview({
   onChangeDate,
   onAddTask,
   savedTasks,
+  previousDayTasks = [],
   onEditTask,
   onDeleteTask,
   loading,
@@ -83,7 +90,10 @@ export function TimelinePreview({
   variant = "talent",
 }: TimelinePreviewProps) {
   const activeSavedTasks = savedTasks.filter((task) => !task.deletedAt);
-  const nextTaskStart = nextStartTime(activeSavedTasks);
+  const schedule = buildDaySchedule(activeSavedTasks, previousDayTasks);
+  const nextStart = nextStartMinute(activeSavedTasks);
+  const previousDayLabel = formatShortDate(addDays(date, -1));
+  const nextDayLabel = formatShortDate(addDays(date, 1));
   const formattedDate = new Intl.DateTimeFormat("id-ID", {
     weekday: "long",
     day: "2-digit",
@@ -120,96 +130,36 @@ export function TimelinePreview({
     nextDate.setDate(nextDate.getDate() + days);
     onChangeDate(nextDate);
   };
-  const dayTasks: TimelineTask[] = activeSavedTasks.map((task, index) => ({
-    id: task.id ?? `saved-${task.startTime}-${task.ticket}-${index}`,
-    project: task.project,
-    title: `${task.type}${task.ticket ? ` · ${task.ticket}` : ""} · ${formatDuration(task.durationMinutes)}`,
-    description: task.summary,
-    tone: task.projectColor,
-    startSlot: timeToSlot(task.startTime),
-    durationSlots: Math.max(1, Math.ceil(task.durationMinutes / 30)),
-    column: "full",
-    badge:
-      task.workStatus === "BERJALAN"
-        ? "Berjalan"
-        : task.workStatus === "TERTAHAN"
-          ? "Tertahan"
-          : task.workStatus === "SELESAI"
-            ? "Selesai"
-            : undefined,
-    sourceTask: task,
-    persisted: true,
-  }));
-
-  const positionedTasks: TimelineTask[] = [];
-
-  const sortedTasks = [...dayTasks].sort((a, b) => a.startSlot - b.startSlot);
-
-  for (const task of sortedTasks) {
-    const hasOverlap = dayTasks.some(
-      (other) =>
-        other.id !== task.id &&
-        task.startSlot < other.startSlot + other.durationSlots &&
-        other.startSlot < task.startSlot + task.durationSlots,
-    );
-
-    if (!hasOverlap) {
-      positionedTasks.push({ ...task, column: "full" });
-      continue;
-    }
-
-    const availableColumns = ["left", "middle", "right"] as const;
-
-    const column =
-      availableColumns.find(
-        (candidate) =>
-          !positionedTasks.some(
-            (placed) =>
-              placed.column === candidate &&
-              task.startSlot < placed.startSlot + placed.durationSlots &&
-              placed.startSlot < task.startSlot + task.durationSlots,
-          ),
-      ) ?? "right";
-
-    positionedTasks.push({ ...task, column });
-  }
+  const earlyTasks = schedule.early?.tasks ?? [];
+  const ownTasks = [
+    ...earlyTasks.filter((entry) => !entry.spill),
+    ...schedule.main.tasks,
+  ].sort((a, b) => a.start - b.start);
 
   const projectSummaries = Object.values(
-    positionedTasks.reduce<
-      Record<
-        string,
-        {
-          name: string;
-          color: TimelineTask["tone"];
-          minutes: number;
-        }
-      >
-    >((summary, task) => {
-      if (task.sourceTask?.type === "Istirahat") return summary;
-
-      const projectName = task.project;
-
+    ownTasks.reduce<
+      Record<string, { name: string; color: TimelineTask["tone"]; minutes: number }>
+    >((summary, entry) => {
+      if (entry.task.type === "Istirahat") return summary;
+      const projectName = entry.task.project;
       if (!summary[projectName]) {
         summary[projectName] = {
           name: projectName,
-          color: task.tone,
+          color: entry.task.projectColor,
           minutes: 0,
         };
       }
-
-      summary[projectName].minutes += task.sourceTask?.durationMinutes ?? 0;
-
+      summary[projectName].minutes += entry.task.durationMinutes;
       return summary;
     }, {}),
   );
+
   const totalWorkedMinutes = (() => {
-    const intervals = dayTasks
-      .filter((task) => task.sourceTask?.type !== "Istirahat")
-      .map((task) => ({
-        start: timeToMinutes(task.sourceTask!.startTime),
-        end:
-          timeToMinutes(task.sourceTask!.startTime) +
-          task.sourceTask!.durationMinutes,
+    const intervals = ownTasks
+      .filter((entry) => entry.task.type !== "Istirahat")
+      .map((entry) => ({
+        start: entry.start,
+        end: resolveStartMinute(entry.task) + entry.task.durationMinutes,
       }))
       .sort((a, b) => a.start - b.start);
 
@@ -218,7 +168,6 @@ export function TimelinePreview({
 
     for (const interval of intervals) {
       if (interval.end <= currentEnd) continue;
-
       const start = Math.max(interval.start, currentEnd);
       total += interval.end - start;
       currentEnd = interval.end;
@@ -431,72 +380,79 @@ export function TimelinePreview({
         role={variant === "review" ? "group" : undefined}
         className="mt-5 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:p-3 lg:p-4"
       >
-        <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-2 sm:grid-cols-[3.75rem_minmax(0,1fr)] sm:gap-3">
-          <div
-            aria-hidden="true"
-            className="grid grid-cols-1"
-            style={{ gridTemplateRows: "repeat(18, minmax(0, 40px)) 24px" }}
-          >
-            {hourLabels.map((hour, index) => (
+        {schedule.early ? (
+          <div className="mb-4">
+            <p className="mb-2 flex flex-wrap items-center gap-2 px-1 text-xs font-semibold text-slate-600">
+              <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700">
+                Dini hari
+              </span>
+              <span className="font-normal text-slate-500">
+                00.00–08.00. Jam setelah tengah malam ditampilkan di tanggal ini.
+              </span>
+            </p>
+            <SegmentGrid
+              segment={schedule.early}
+              variant={variant}
+              readOnly={readOnly}
+              onAddTask={onAddTask}
+              onEditTask={onEditTask}
+              spillLabel={previousDayLabel}
+              hideLastLabel={schedule.early.endMinute >= WORKDAY_START_MINUTE}
+            />
+            {schedule.early.endMinute < WORKDAY_START_MINUTE ? (
+              // Jam 08.00 tetap jadi awal segmen jam kerja, jadi selang di
+              // antaranya dipisahkan dengan pembatas agar linimasa tidak
+              // terlihat menyatu.
               <div
-                key={hour}
-                className="pt-1 text-xs font-medium text-slate-500 sm:text-sm"
-                style={{ gridRow: index === 9 ? 19 : index * 2 + 1 }}
+                aria-hidden="true"
+                className="mt-3 grid grid-cols-[3.25rem_minmax(0,1fr)] items-center gap-2 sm:grid-cols-[3.75rem_minmax(0,1fr)] sm:gap-3"
               >
-                {hour}
+                <span />
+                <span className="flex items-center gap-2 sm:gap-3">
+                  <span className="h-px flex-1 border-t border-dashed border-slate-300" />
+                  <span className="shrink-0 rounded-full border border-dashed border-slate-300 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-500">
+                    {formatBoundary(schedule.early.endMinute)} →{" "}
+                    {formatHourLabel(WORKDAY_START_MINUTE)}
+                  </span>
+                  <span className="h-px flex-1 border-t border-dashed border-slate-300" />
+                </span>
               </div>
-            ))}
+            ) : null}
           </div>
-          <div
-            className="relative grid min-w-0 grid-cols-3 gap-x-1.5 sm:gap-x-2"
-            style={{ gridTemplateRows: "repeat(18, minmax(0, 40px)) 24px" }}
-          >
-            {variant === "talent"
-              ? Array.from({ length: 18 }, (_, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    aria-label={`Tambah task pukul ${slotToInputTime(index + 1)}`}
-                    onClick={() => onAddTask(slotToInputTime(index + 1))}
-                    disabled={readOnly}
-                    className={`col-span-3 h-full border-t border-slate-100 bg-transparent text-left ${
-                      readOnly
-                        ? "cursor-not-allowed"
-                        : "cursor-pointer hover:bg-blue-50/40"
-                    }`}
-                    style={{ gridRow: index + 1 }}
-                  />
-                ))
-              : null}
-            {positionedTasks.map((task) => (
-              <TimelineBlock
-                key={task.id}
-                task={task}
-                onEdit={onEditTask}
-                readOnly={readOnly}
-                variant={variant}
-              />
-            ))}
-            <div
-              className="z-10 flex items-center rounded-xl border border-dashed border-slate-300 bg-white px-3 text-sm text-slate-500"
-              style={{ gridRow: "9 / span 2", gridColumn: "1 / -1" }}
-            >
-              <Coffee size={18} className="mr-3 shrink-0" />
-              Istirahat
-            </div>
-          </div>
-        </div>
+        ) : null}
+
+        <SegmentGrid
+          segment={schedule.main}
+          variant={variant}
+          readOnly={readOnly}
+          onAddTask={onAddTask}
+          onEditTask={onEditTask}
+          spillLabel={previousDayLabel}
+          showBreak
+        />
+
         {variant === "talent" && !readOnly ? (
-          <button
-            type="button"
-            onClick={() => onAddTask(nextTaskStart)}
-            className="ml-[3.75rem] mt-3 flex h-12 w-[calc(100%-3.75rem)] items-center justify-center rounded-xl border border-dashed border-brand bg-white text-sm font-semibold text-brand transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:ml-[4.5rem] sm:w-[calc(100%-4.5rem)]"
-          >
-            <Plus size={18} className="mr-2" />
-            Tambah task mulai {nextTaskStart.replace(":", ".")}
-          </button>
+          nextStart === null ? (
+            <p
+              className="ml-[3.75rem] mt-3 rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 sm:ml-[4.5rem]"
+              role="status"
+            >
+              Task terakhir berlanjut melewati tengah malam. Lanjutannya (00.00–08.00)
+              diisi pada tanggal {nextDayLabel}.
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onAddTask(nextStart)}
+              className="ml-[3.75rem] mt-3 flex h-12 w-[calc(100%-3.75rem)] items-center justify-center rounded-xl border border-dashed border-brand bg-white text-sm font-semibold text-brand transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:ml-[4.5rem] sm:w-[calc(100%-4.5rem)]"
+            >
+              <Plus size={18} className="mr-2" />
+              Tambah task mulai {formatClock(nextStart, ".")}
+            </button>
+          )
         ) : null}
       </div>
+
       {variant === "talent" ? (
         <section
           className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -510,64 +466,70 @@ export function TimelinePreview({
               </p>
             </div>
             <span className="text-xs font-medium text-slate-500">
-              {dayTasks.length} task
+              {ownTasks.length} task
             </span>
           </div>
           <ul className="mt-3 divide-y divide-slate-100">
-            {dayTasks.length === 0 && !loading ? (
+            {ownTasks.length === 0 && !loading ? (
               <li className="py-3 text-sm text-slate-500">
                 Belum ada task pada tanggal ini.
               </li>
             ) : null}
-            {positionedTasks.map((task) => (
-              <li
-                key={`list-${task.id}`}
-                className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold">{task.title}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {task.project} ·{" "}
-                    {task.sourceTask?.startTime ?? slotToTime(task.startSlot)} ·{" "}
-                    {formatDuration(
-                      task.sourceTask?.durationMinutes ??
-                        task.durationSlots * 30,
-                    )}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {task.description}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {task.sourceTask ? (
-                    readOnly ? null : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => onEditTask(task.sourceTask!)}
-                          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                        >
-                          Edit
-                        </button>
-                        {task.persisted ? (
+            {ownTasks.map((entry) => {
+              const segment =
+                entry.start < schedule.main.startMinute && schedule.early
+                  ? schedule.early
+                  : schedule.main;
+              const task = toTimelineTask(entry, segment, previousDayLabel);
+              const continuesNextDay =
+                entry.continuesNextDay && entry.start >= schedule.main.startMinute;
+              return (
+                <li
+                  key={`list-${task.id}`}
+                  className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">{task.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {task.project} · {formatClock(entry.start)} ·{" "}
+                      {formatDuration(entry.task.durationMinutes)}
+                      {continuesNextDay ? ` · berlanjut ke ${nextDayLabel}` : null}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {entry.task.summary}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {task.sourceTask ? (
+                      readOnly ? null : (
+                        <>
                           <button
                             type="button"
-                            onClick={() => onDeleteTask(task.sourceTask!.id!)}
-                            className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                            onClick={() => onEditTask(task.sourceTask!)}
+                            className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                           >
-                            Hapus
+                            Edit
                           </button>
-                        ) : null}
-                      </>
-                    )
-                  ) : (
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                      Selesai
-                    </span>
-                  )}
-                </div>
-              </li>
-            ))}
+                          {task.persisted ? (
+                            <button
+                              type="button"
+                              onClick={() => onDeleteTask(task.sourceTask!.id!)}
+                              className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                            >
+                              Hapus
+                            </button>
+                          ) : null}
+                        </>
+                      )
+                    ) : (
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                        Selesai
+                      </span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}
@@ -575,20 +537,185 @@ export function TimelinePreview({
   );
 }
 
-function timeToSlot(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 17;
-  return Math.min(
-    18,
-    Math.max(1, (hours - 8) * 2 + Math.floor(minutes / 30) + 1),
+function SegmentGrid({
+  segment,
+  variant,
+  readOnly,
+  onAddTask,
+  onEditTask,
+  spillLabel,
+  showBreak = false,
+  hideLastLabel = false,
+}: {
+  segment: TimelineSegment;
+  variant: "talent" | "review";
+  readOnly: boolean;
+  onAddTask: (startMinute?: number) => void;
+  onEditTask: (task: TaskDraft) => void;
+  spillLabel: string;
+  showBreak?: boolean;
+  hideLastLabel?: boolean;
+}) {
+  const slots = Math.max(1, Math.round((segment.endMinute - segment.startMinute) / SLOT_MINUTES));
+  const hourMarks = (() => {
+    const marks: Array<{ minute: number; label: string }> = [];
+    for (let minute = segment.startMinute; minute < segment.endMinute; minute += 60) {
+      marks.push({ minute, label: formatHourLabel(minute) });
+    }
+    // Jam penutup memakai waktu sebenarnya, mis. 05.30 ketika area tambahan
+    // berakhir di tengah jam. Jam bulat tetap ditulis sebagai 24.00.
+    marks.push({ minute: segment.endMinute, label: formatBoundary(segment.endMinute) });
+    return marks;
+  })();
+  const positioned = positionTasks(segment, spillLabel);
+  const breakRow = showBreak ? (12 * 60 - segment.startMinute) / SLOT_MINUTES + 1 : null;
+
+  return (
+    <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-2 sm:grid-cols-[3.75rem_minmax(0,1fr)] sm:gap-3">
+      <div
+        aria-hidden="true"
+        className="grid grid-cols-1"
+        style={{
+          gridTemplateRows: `repeat(${slots}, minmax(0, 40px)) 24px`,
+        }}
+      >
+        {hourMarks.map((mark, index) => {
+          // Jam penutup segmen dini hari (08.00) juga menjadi jam pembuka
+          // segmen jam kerja, jadi cukup ditampilkan sekali.
+          if (hideLastLabel && index === hourMarks.length - 1) return null;
+          return (
+            <div
+              key={mark.minute}
+              className="pt-1 text-xs font-medium text-slate-500 sm:text-sm"
+              style={{
+                gridRow: (mark.minute - segment.startMinute) / SLOT_MINUTES + 1,
+              }}
+            >
+              {mark.label}
+            </div>
+          );
+        })}
+      </div>
+      <div
+        className="relative grid min-w-0 grid-cols-3 gap-x-1.5 sm:gap-x-2"
+        style={{
+          gridTemplateRows: `repeat(${slots}, minmax(0, 40px)) 24px`,
+        }}
+      >
+        {variant === "talent"
+          ? Array.from({ length: slots }, (_, index) => {
+              const slotStart = segment.startMinute + index * SLOT_MINUTES;
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  aria-label={`Tambah task pukul ${formatClock(slotStart)}`}
+                  onClick={() => onAddTask(slotStart)}
+                  disabled={readOnly}
+                  className={`col-span-3 h-full border-t border-slate-100 bg-transparent text-left ${
+                    readOnly
+                      ? "cursor-not-allowed"
+                      : "cursor-pointer hover:bg-blue-50/40"
+                  }`}
+                  style={{ gridRow: index + 1 }}
+                />
+              );
+            })
+          : null}
+        {positioned.map((task) => (
+          <TimelineBlock
+            key={task.id}
+            task={task}
+            onEdit={onEditTask}
+            readOnly={readOnly}
+            variant={variant}
+          />
+        ))}
+        {breakRow !== null ? (
+          <div
+            className="z-10 flex items-center rounded-xl border border-dashed border-slate-300 bg-white px-3 text-sm text-slate-500"
+            style={{ gridRow: `${breakRow} / span 2`, gridColumn: "1 / -1" }}
+          >
+            <Coffee size={18} className="mr-3 shrink-0" />
+            Istirahat
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
-function timeToMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
-  return Number.isFinite(hours) && Number.isFinite(minutes)
-    ? hours * 60 + minutes
-    : 0;
+function toTimelineTask(
+  entry: ScheduledTask,
+  segment: TimelineSegment,
+  spillLabel: string,
+): TimelineTask {
+  const startSlot = Math.round((entry.start - segment.startMinute) / SLOT_MINUTES) + 1;
+  const durationSlots = Math.max(
+    1,
+    Math.ceil((entry.end - entry.start) / SLOT_MINUTES),
+  );
+  const workStatusBadge =
+    entry.task.workStatus === "BERJALAN"
+      ? "Berjalan"
+      : entry.task.workStatus === "TERTAHAN"
+        ? "Tertahan"
+        : entry.task.workStatus === "SELESAI"
+          ? "Selesai"
+          : undefined;
+
+  return {
+    id: entry.task.id ?? `saved-${entry.task.startTime}-${entry.task.ticket}-${entry.start}`,
+    project: entry.task.project,
+    title: `${entry.task.type}${entry.task.ticket ? ` · ${entry.task.ticket}` : ""} · ${formatDuration(entry.task.durationMinutes)}`,
+    description: entry.task.summary,
+    tone: entry.task.projectColor,
+    startSlot,
+    durationSlots,
+    column: "full",
+    badge: entry.spill ? `Lanjutan ${spillLabel}` : workStatusBadge,
+    sourceTask: entry.task,
+    persisted: Boolean(entry.task.id),
+    spill: entry.spill,
+    continuesNextDay: entry.continuesNextDay,
+  };
+}
+
+function positionTasks(segment: TimelineSegment, spillLabel: string) {
+  const positioned: TimelineTask[] = [];
+
+  for (const entry of segment.tasks) {
+    const task = toTimelineTask(entry, segment, spillLabel);
+    const hasOverlap = segment.tasks.some((other) => {
+      if (other === entry) return false;
+      const otherTask = toTimelineTask(other, segment, spillLabel);
+      return (
+        task.startSlot < otherTask.startSlot + otherTask.durationSlots &&
+        otherTask.startSlot < task.startSlot + task.durationSlots
+      );
+    });
+
+    if (!hasOverlap) {
+      positioned.push({ ...task, column: "full" });
+      continue;
+    }
+
+    const availableColumns = ["left", "middle", "right"] as const;
+    const column =
+      availableColumns.find(
+        (candidate) =>
+          !positioned.some(
+            (placed) =>
+              placed.column === candidate &&
+              task.startSlot < placed.startSlot + placed.durationSlots &&
+              placed.startSlot < task.startSlot + task.durationSlots,
+          ),
+      ) ?? "right";
+
+    positioned.push({ ...task, column });
+  }
+
+  return positioned;
 }
 
 export function dailyLogStatusLabel(status: string | null) {
@@ -612,14 +739,24 @@ export function formatDuration(minutes: number) {
   return remainder ? `${hours} j ${remainder} m` : `${hours} j`;
 }
 
-function slotToTime(slot: number) {
-  const totalMinutes = 8 * 60 + (slot - 1) * 30;
-  return `${String(Math.floor(totalMinutes / 60)).padStart(2, "0")}.${String(totalMinutes % 60).padStart(2, "0")}`;
+function addDays(date: Date, days: number) {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
 }
 
-function slotToInputTime(slot: number) {
-  const totalMinutes = 8 * 60 + (slot - 1) * 30;
-  return `${String(Math.floor(totalMinutes / 60)).padStart(2, "0")}:${String(totalMinutes % 60).padStart(2, "0")}`;
+function formatShortDate(date: Date) {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "short",
+  }).format(date);
+}
+
+/** Label batas jam: jam bulat ditulis 08.00, selain itu 05.30. */
+function formatBoundary(totalMinutes: number) {
+  return totalMinutes % 60 === 0
+    ? formatHourLabel(totalMinutes)
+    : formatClock(totalMinutes, ".");
 }
 
 function TimelineBlock({
@@ -635,7 +772,10 @@ function TimelineBlock({
 }) {
   const orange = task.tone === "orange";
   const interactive =
-    variant === "talent" && Boolean(task.sourceTask) && !readOnly;
+    variant === "talent" &&
+    Boolean(task.sourceTask) &&
+    !task.spill &&
+    !readOnly;
   const reviewTitle = [
     task.project,
     task.title,
@@ -678,11 +818,21 @@ function TimelineBlock({
       title={variant === "review" ? reviewTitle : undefined}
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
-      className={`group z-10 min-w-0 overflow-hidden ${variant === "review" ? "rounded-lg border p-1 sm:p-1.5" : "rounded-xl border p-2.5 sm:p-3 lg:p-4"} ${orange ? "border-orange-200 bg-orange-50" : "border-blue-200 bg-blue-50"} ${interactive ? "cursor-pointer hover:brightness-95" : ""}`}
+      className={`group z-10 min-w-0 overflow-hidden ${
+        variant === "review"
+          ? "rounded-lg border p-1 sm:p-1.5"
+          : "rounded-xl border p-2.5 sm:p-3 lg:p-4"
+      } ${
+        task.spill
+          ? "border-dashed border-slate-300 bg-slate-50"
+          : orange
+            ? "border-orange-200 bg-orange-50"
+            : "border-blue-200 bg-blue-50"
+      } ${interactive ? "cursor-pointer hover:brightness-95" : ""}`}
       style={{
         gridRow: `${task.startSlot} / span ${task.durationSlots}`,
         gridColumn,
-        ...(task.tone.startsWith("#")
+        ...(task.tone.startsWith("#") && !task.spill
           ? { borderColor: task.tone, backgroundColor: `${task.tone}18` }
           : {}),
       }}
@@ -743,9 +893,11 @@ function TimelineBlock({
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={`inline-flex max-w-full items-center gap-2 truncate rounded-full px-2.5 py-1 text-[10px] font-bold sm:px-3 sm:text-xs ${
-                orange
-                  ? "bg-orange-100 text-orange-700"
-                  : "bg-blue-100 text-blue-700"
+                task.spill
+                  ? "bg-slate-200 text-slate-700"
+                  : orange
+                    ? "bg-orange-100 text-orange-700"
+                    : "bg-blue-100 text-blue-700"
               }`}
             >
               <Folder size={13} className="shrink-0" />
@@ -755,14 +907,21 @@ function TimelineBlock({
             {task.badge ? (
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold sm:text-xs ${
-                  task.badge === "Selesai"
-                    ? "bg-green-100 text-green-700"
-                    : task.badge === "Berjalan"
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-orange-100 text-orange-700"
+                  task.spill
+                    ? "bg-slate-200 text-slate-700"
+                    : task.badge === "Selesai"
+                      ? "bg-green-100 text-green-700"
+                      : task.badge === "Berjalan"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-orange-100 text-orange-700"
                 }`}
               >
                 {task.badge}
+              </span>
+            ) : null}
+            {task.continuesNextDay && !task.spill ? (
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+                Lanjut setelah 24.00
               </span>
             ) : null}
           </div>

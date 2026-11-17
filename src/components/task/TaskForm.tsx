@@ -6,7 +6,9 @@ import { ProjectChip } from "@/components/shared/ProjectChip";
 import { StatusSegmented } from "@/components/shared/StatusSegmented";
 import { TaskTypePill } from "@/components/shared/TaskTypePill";
 import { logger } from "@/lib/logger";
+import { toMinutes } from "@/lib/taskTime";
 import type {
+  ContinueTask,
   DurationOption,
   ProjectOption,
   TaskTypeOption,
@@ -21,6 +23,7 @@ type TaskFormProps = {
   onFieldChange?: (field: TaskFormField) => void;
   initialTask?: TaskDraft | null;
   initialStartTime?: string;
+  continueTasks?: ContinueTask[];
   projects: ProjectOption[];
   taskTypes: TaskTypeOption[];
   workStatuses: WorkStatusOption[];
@@ -46,6 +49,7 @@ export function TaskForm({
   onFieldChange,
   initialTask,
   initialStartTime,
+  continueTasks = [],
   projects,
   taskTypes,
   workStatuses,
@@ -66,7 +70,7 @@ export function TaskForm({
   const [ticket, setTicket] = useState(initialTask?.ticket ?? "");
   const [startTime, setStartTime] = useState((initialTask?.startTime ?? initialStartTime ?? "08:00").slice(0, 5));
   const selectedProjectId = projectId || (initialTask?.projectId ? String(initialTask.projectId) : "");
-  const selectedTypeId = typeId || (initialTask?.taskTypeId ? String(initialTask.taskTypeId) : String(taskTypes[0]?.id ?? ""));
+  const selectedTypeId = typeId || (initialTask?.taskTypeId ? String(initialTask.taskTypeId) : "");
   const selectedDuration = duration ?? (
     initialTask
       ? durations.some((item) => item.minutes === initialTask.durationMinutes) ? String(initialTask.durationMinutes) : "other"
@@ -79,6 +83,12 @@ export function TaskForm({
   const durationMinutes = selectedDuration === "other"
     ? Number(customDuration)
     : selectedDuration ? Number(selectedDuration) : Number.NaN;
+  const startMinutes = toMinutes(startTime);
+  const outsideWorkHours = Number.isFinite(startMinutes) && (
+    startMinutes < 8 * 60
+    || startMinutes >= 17 * 60
+    || (Number.isFinite(durationMinutes) && startMinutes + durationMinutes > 17 * 60)
+  );
 
   // Dihitung dari isi form, bukan dari status submit: galat wajib sudah tampil
   // begitu panel dibuka dan langsung hilang saat field diperbaiki.
@@ -96,6 +106,32 @@ export function TaskForm({
       });
 
   const notifyFieldChange = (field: TaskFormField) => onFieldChange?.(field);
+
+  // Saran ini hanya relevan saat menambah task baru; saat mengubah task, isi
+  // form sudah berasal dari task yang dipilih.
+  const continueSuggestions = initialTask
+    ? []
+    : buildContinueSuggestions(continueTasks, projects, taskTypes);
+
+  const applyContinueSuggestion = (suggestion: ContinueSuggestion) => {
+    if (suggestion.project) {
+      setProjectId(String(suggestion.project.project_id));
+      notifyFieldChange("project");
+    }
+    if (suggestion.type) {
+      setTypeId(String(suggestion.type.id));
+      notifyFieldChange("type");
+    }
+    if (suggestion.ticket) {
+      setTicket(suggestion.ticket);
+      notifyFieldChange("ticket");
+    }
+    logger.info("Melanjutkan task dari hari sebelumnya", {
+      ticket: suggestion.ticket,
+      project: suggestion.project?.project_name,
+      type: suggestion.type?.name,
+    });
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -152,6 +188,36 @@ export function TaskForm({
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+      {continueSuggestions.length > 0 ? (
+        <section aria-label="Lanjutkan pekerjaan" className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+          {continueSuggestions.map((suggestion) => {
+            const label = suggestion.ticket || suggestion.project?.project_name || "task sebelumnya";
+            const summary = suggestion.summary.replace(/[.!?\s]+$/, "");
+            return (
+              <div key={suggestion.key} className="flex flex-wrap items-center justify-between gap-3">
+                <p className="min-w-0 flex-1 text-sm text-slate-700">
+                  Lanjutkan <span className="font-semibold text-ink">{label}</span>
+                  {summary ? (
+                    <>
+                      {" "}
+                      <span className="text-slate-600 line-clamp-2">{summary}</span>
+                    </>
+                  ) : null}?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => applyContinueSuggestion(suggestion)}
+                  disabled={loading || blocked || saving}
+                  aria-label={`Lanjutkan ${label}`}
+                  className="rounded-lg border border-brand/30 bg-white px-3 py-1.5 text-xs font-semibold text-brand hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                >
+                  Lanjutkan
+                </button>
+              </div>
+            );
+          })}
+        </section>
+      ) : null}
       {formError ? <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{formError}</p> : null}
       {loading ? <p className="text-sm text-slate-500" role="status">Memuat pilihan task...</p> : null}
 
@@ -193,6 +259,11 @@ export function TaskForm({
           {showError("duration")}
         </label>
       </div>
+      {outsideWorkHours ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status">
+          Peringatan: Waktu task berada di luar jam kerja normal (08.00–17.00). Task tetap bisa disimpan dan akan ditampilkan pada baris jam yang sesuai.
+        </p>
+      ) : null}
       {selectedDuration === "other" ? (
         <label className="block">
           <span className="mb-2 block text-sm font-semibold">Durasi (menit)</span>
@@ -201,7 +272,11 @@ export function TaskForm({
         </label>
       ) : null}
 
-      <fieldset disabled={loading || blocked || saving}>
+      <fieldset
+        disabled={loading || blocked || saving}
+        aria-invalid={hasError("type")}
+        className={`disabled:opacity-70 ${hasError("type") ? "rounded-lg border border-red-500 p-3" : ""}`}
+      >
         <legend className="mb-2 text-sm font-semibold">Jenis task <span className="text-brand">*</span></legend>
         <div className="flex flex-wrap gap-2">
           {taskTypes.map((item) => (
@@ -244,6 +319,43 @@ export function TaskForm({
       </div>
     </form>
   );
+}
+
+type ContinueSuggestion = {
+  key: number;
+  ticket: string | null;
+  summary: string;
+  project: ProjectOption | null;
+  type: TaskTypeOption | null;
+};
+
+/**
+ * Mencocokkan saran "Lanjutkan" (yang membawa nama) dengan pilihan form (yang
+ * memakai id). Saran tanpa proyek yang cocok disembunyikan karena proyek wajib
+ * dipilih dan proyek tersebut mungkin sudah tidak aktif.
+ */
+function buildContinueSuggestions(
+  tasks: ContinueTask[],
+  projects: ProjectOption[],
+  taskTypes: TaskTypeOption[]
+): ContinueSuggestion[] {
+  return tasks.flatMap((task) => {
+    const project = projects.find((item) => namesMatch(item.project_name, task.project));
+    if (!project) return [];
+
+    return [{
+      key: task.id,
+      ticket: task.ticket,
+      summary: task.summary,
+      project,
+      type: taskTypes.find((item) => namesMatch(item.name, task.type)) ?? null,
+    }];
+  });
+}
+
+function namesMatch(option: string, suggestion: string | null) {
+  if (!suggestion) return false;
+  return option.trim().toLowerCase() === suggestion.trim().toLowerCase();
 }
 
 function statusForOption(option: WorkStatusOption): WorkStatus | undefined {
