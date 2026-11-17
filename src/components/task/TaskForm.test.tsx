@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { TaskForm } from "@/components/task/TaskForm";
@@ -17,7 +17,10 @@ function renderTaskForm(onSave: (task: TaskDraft) => Promise<void> = vi.fn(async
       ]}
       taskTypes={[{ id: 2, name: "Development" }]}
       workStatuses={[{ id: 3, name: "Berjalan" }]}
-      durations={[{ minutes: 30, label: "30 m" }]}
+      durations={[
+        { minutes: 30, label: "30 m" },
+        { minutes: 60, label: "1 j" },
+      ]}
       loading={false}
       saving={false}
     />,
@@ -30,6 +33,11 @@ describe("TaskForm", () => {
   it("shows required-field errors and does not save an incomplete task", async () => {
     const { user, onSave } = renderTaskForm();
 
+    expect(screen.getByText("Pilih jenis task yang tersedia.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Development" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     await user.click(screen.getByRole("button", { name: "Simpan task" }));
 
     expect(screen.getByText("Proyek wajib dipilih.")).toBeInTheDocument();
@@ -43,6 +51,7 @@ describe("TaskForm", () => {
     const { user } = renderTaskForm(onSave);
 
     await user.click(screen.getByRole("button", { name: "Alpha" }));
+    await user.click(screen.getByRole("button", { name: "Development" }));
     await user.selectOptions(screen.getByRole("combobox"), "30");
     await user.type(screen.getByRole("textbox", { name: /Ringkasan dan hasil/ }), "Menyelesaikan fitur");
     await user.click(screen.getByRole("button", { name: "Simpan task" }));
@@ -64,5 +73,32 @@ describe("TaskForm", () => {
 
     expect(screen.getByText("Format tiket tidak valid. Contoh: ABC-154")).toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("warns about after-hours tasks without blocking save", async () => {
+    const onSave = vi.fn(async () => undefined);
+    const { user } = renderTaskForm(onSave);
+
+    await user.click(screen.getByRole("button", { name: "Alpha" }));
+    await user.click(screen.getByRole("button", { name: "Development" }));
+    fireEvent.change(screen.getByLabelText(/Mulai/), {
+      target: { value: "18:00" },
+    });
+    await user.selectOptions(screen.getByRole("combobox"), "60");
+    await user.type(
+      screen.getByRole("textbox", { name: /Ringkasan dan hasil/ }),
+      "Menyelesaikan fitur",
+    );
+
+    expect(
+      screen.getByText(/di luar jam kerja normal \(08\.00–17\.00\)/),
+    ).toHaveClass("bg-amber-50");
+    expect(onSave).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Simpan task" }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ startTime: "18:00", durationMinutes: 60 }),
+    );
   });
 });

@@ -6,6 +6,7 @@ import { ProjectChip } from "@/components/shared/ProjectChip";
 import { StatusSegmented } from "@/components/shared/StatusSegmented";
 import { TaskTypePill } from "@/components/shared/TaskTypePill";
 import { logger } from "@/lib/logger";
+import { toMinutes } from "@/lib/taskTime";
 import type {
   DurationOption,
   ProjectOption,
@@ -66,7 +67,7 @@ export function TaskForm({
   const [ticket, setTicket] = useState(initialTask?.ticket ?? "");
   const [startTime, setStartTime] = useState((initialTask?.startTime ?? initialStartTime ?? "08:00").slice(0, 5));
   const selectedProjectId = projectId || (initialTask?.projectId ? String(initialTask.projectId) : "");
-  const selectedTypeId = typeId || (initialTask?.taskTypeId ? String(initialTask.taskTypeId) : String(taskTypes[0]?.id ?? ""));
+  const selectedTypeId = typeId || (initialTask?.taskTypeId ? String(initialTask.taskTypeId) : "");
   const selectedDuration = duration ?? (
     initialTask
       ? durations.some((item) => item.minutes === initialTask.durationMinutes) ? String(initialTask.durationMinutes) : "other"
@@ -79,6 +80,12 @@ export function TaskForm({
   const durationMinutes = selectedDuration === "other"
     ? Number(customDuration)
     : selectedDuration ? Number(selectedDuration) : Number.NaN;
+  const startMinutes = toMinutes(startTime);
+  const outsideWorkHours = Number.isFinite(startMinutes) && (
+    startMinutes < 8 * 60
+    || startMinutes >= 17 * 60
+    || (Number.isFinite(durationMinutes) && startMinutes + durationMinutes > 17 * 60)
+  );
 
   // Dihitung dari isi form, bukan dari status submit: galat wajib sudah tampil
   // begitu panel dibuka dan langsung hilang saat field diperbaiki.
@@ -193,6 +200,11 @@ export function TaskForm({
           {showError("duration")}
         </label>
       </div>
+      {outsideWorkHours ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status">
+          Peringatan: Waktu task berada di luar jam kerja normal (08.00–17.00). Task tetap bisa disimpan dan akan ditampilkan pada baris jam yang sesuai.
+        </p>
+      ) : null}
       {selectedDuration === "other" ? (
         <label className="block">
           <span className="mb-2 block text-sm font-semibold">Durasi (menit)</span>
@@ -201,7 +213,11 @@ export function TaskForm({
         </label>
       ) : null}
 
-      <fieldset disabled={loading || blocked || saving}>
+      <fieldset
+        disabled={loading || blocked || saving}
+        aria-invalid={hasError("type")}
+        className={`disabled:opacity-70 ${hasError("type") ? "rounded-lg border border-red-500 p-3" : ""}`}
+      >
         <legend className="mb-2 text-sm font-semibold">Jenis task <span className="text-brand">*</span></legend>
         <div className="flex flex-wrap gap-2">
           {taskTypes.map((item) => (

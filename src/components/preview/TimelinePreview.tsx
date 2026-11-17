@@ -14,11 +14,6 @@ import { nextStartTime } from "@/lib/taskTime";
 import type { DayInfo } from "@/services/taskService";
 import type { ProjectColor, TaskDraft } from "@/types/task";
 
-const hourLabels = Array.from(
-  { length: 10 },
-  (_, index) => `${String(index + 8).padStart(2, "0")}.00`,
-);
-
 type TimelineTask = {
   id: string;
   project: string;
@@ -140,6 +135,21 @@ export function TimelinePreview({
     sourceTask: task,
     persisted: true,
   }));
+  const latestTaskEnd = dayTasks.reduce(
+    (latest, task) =>
+      Math.max(
+        latest,
+        timeToMinutes(task.sourceTask!.startTime) +
+          task.sourceTask!.durationMinutes,
+      ),
+    17 * 60,
+  );
+  const timelineEndHour = Math.max(17, Math.ceil(latestTaskEnd / 60));
+  const timelineSlots = (timelineEndHour - 8) * 2;
+  const hourLabels = Array.from(
+    { length: timelineEndHour - 8 + 1 },
+    (_, index) => `${String(index + 8).padStart(2, "0")}.00`,
+  );
 
   const positionedTasks: TimelineTask[] = [];
 
@@ -435,13 +445,20 @@ export function TimelinePreview({
           <div
             aria-hidden="true"
             className="grid grid-cols-1"
-            style={{ gridTemplateRows: "repeat(18, minmax(0, 40px)) 24px" }}
+            style={{
+              gridTemplateRows: `repeat(${timelineSlots}, minmax(0, 40px)) 24px`,
+            }}
           >
             {hourLabels.map((hour, index) => (
               <div
                 key={hour}
                 className="pt-1 text-xs font-medium text-slate-500 sm:text-sm"
-                style={{ gridRow: index === 9 ? 19 : index * 2 + 1 }}
+                style={{
+                  gridRow:
+                    index === hourLabels.length - 1
+                      ? timelineSlots + 1
+                      : index * 2 + 1,
+                }}
               >
                 {hour}
               </div>
@@ -449,10 +466,12 @@ export function TimelinePreview({
           </div>
           <div
             className="relative grid min-w-0 grid-cols-3 gap-x-1.5 sm:gap-x-2"
-            style={{ gridTemplateRows: "repeat(18, minmax(0, 40px)) 24px" }}
+            style={{
+              gridTemplateRows: `repeat(${timelineSlots}, minmax(0, 40px)) 24px`,
+            }}
           >
             {variant === "talent"
-              ? Array.from({ length: 18 }, (_, index) => (
+              ? Array.from({ length: timelineSlots }, (_, index) => (
                   <button
                     key={index}
                     type="button"
@@ -577,11 +596,8 @@ export function TimelinePreview({
 
 function timeToSlot(value: string) {
   const [hours, minutes] = value.split(":").map(Number);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 17;
-  return Math.min(
-    18,
-    Math.max(1, (hours - 8) * 2 + Math.floor(minutes / 30) + 1),
-  );
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 1;
+  return Math.max(1, (hours - 8) * 2 + Math.floor(minutes / 30) + 1);
 }
 
 function timeToMinutes(value: string) {
