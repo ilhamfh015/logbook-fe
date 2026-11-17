@@ -6,7 +6,6 @@ import { Dialog } from "@/components/shared/Dialog";
 import { SidePanel } from "@/components/shared/SidePanel";
 import { TaskForm, type TaskFormField } from "@/components/task/TaskForm";
 import { ApiError } from "@/services/apiClient";
-import { nextStartMinute } from "@/lib/taskTime";
 import { logger } from "@/lib/logger";
 import {
   taskService,
@@ -210,13 +209,26 @@ export function TaskShowcase() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const openNewTask = async (time?: string | number) => {
+  const formatTimeFromMinute = (minute: number) => {
+  const h = Math.floor(minute / 60).toString().padStart(2, "0");
+  const m = (minute % 60).toString().padStart(2, "0");
+  return `${h}:${m}`;
+};
+
+const openNewTask = async (time?: string | number) => {
     setNotice("");
     setFormError("");
     setFieldErrors({});
     setEditingTask(null);
-    const suggestedStartTime = (time ?? nextStartMinute(savedTasks)) != null ? String(time ?? nextStartMinute(savedTasks)) : "08:00";
-    setStartTime(suggestedStartTime ? String(suggestedStartTime) : "08:00");
+    let minute: number | undefined;
+    if (typeof time === "number") {
+      minute = time;
+    } else if (time) {
+      const parsed = Number(time);
+      if (Number.isFinite(parsed)) minute = parsed;
+    }
+    const suggestedStartTime = minute != null ? formatTimeFromMinute(minute) : "08:00";
+    setStartTime(suggestedStartTime);
     logger.info("Membuka form task baru", {
       date: formatDate(selectedDate),
       startTime: suggestedStartTime,
