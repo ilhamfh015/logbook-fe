@@ -30,6 +30,24 @@ export type ApiTask = {
   obstacle: string | null;
 };
 
+/**
+ * Saran "Lanjutkan" dari GET /api/continue: task Berjalan/Tertahan pada hari
+ * terakhir yang berisi catatan. Berbeda dari {@link ApiTask}, bentuk ini
+ * memakai nama (bukan id) karena dipakai untuk mengisi form.
+ */
+export type ContinueTask = {
+  id: number;
+  project: string | null;
+  color: string | null;
+  ticket: string | null;
+  startMinute: number | null;
+  durationMinutes: number;
+  type: string | null;
+  summary: string;
+  workStatus: string | null;
+  obstacle: string | null;
+};
+
 export type DayInfo = {
   date: string;
   holidayName: string | null;
@@ -67,6 +85,8 @@ type TaskRequest = {
 
 export const taskService = {
   getProjects: () => apiFetch<ProjectOption[]>("/api/projects"),
+
+  getContinueTasks: () => apiFetch<ContinueTask[]>("/api/continue"),
 
   getMasterData: () => apiFetch<TaskMasterData>("/api/tasks/master-data"),
 

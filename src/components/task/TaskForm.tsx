@@ -8,6 +8,7 @@ import { TaskTypePill } from "@/components/shared/TaskTypePill";
 import { logger } from "@/lib/logger";
 import { toMinutes } from "@/lib/taskTime";
 import type {
+  ContinueTask,
   DurationOption,
   ProjectOption,
   TaskTypeOption,
@@ -22,6 +23,7 @@ type TaskFormProps = {
   onFieldChange?: (field: TaskFormField) => void;
   initialTask?: TaskDraft | null;
   initialStartTime?: string;
+  continueTasks?: ContinueTask[];
   projects: ProjectOption[];
   taskTypes: TaskTypeOption[];
   workStatuses: WorkStatusOption[];
@@ -47,6 +49,7 @@ export function TaskForm({
   onFieldChange,
   initialTask,
   initialStartTime,
+  continueTasks = [],
   projects,
   taskTypes,
   workStatuses,
@@ -104,6 +107,32 @@ export function TaskForm({
 
   const notifyFieldChange = (field: TaskFormField) => onFieldChange?.(field);
 
+  // Saran ini hanya relevan saat menambah task baru; saat mengubah task, isi
+  // form sudah berasal dari task yang dipilih.
+  const continueSuggestions = initialTask
+    ? []
+    : buildContinueSuggestions(continueTasks, projects, taskTypes);
+
+  const applyContinueSuggestion = (suggestion: ContinueSuggestion) => {
+    if (suggestion.project) {
+      setProjectId(String(suggestion.project.project_id));
+      notifyFieldChange("project");
+    }
+    if (suggestion.type) {
+      setTypeId(String(suggestion.type.id));
+      notifyFieldChange("type");
+    }
+    if (suggestion.ticket) {
+      setTicket(suggestion.ticket);
+      notifyFieldChange("ticket");
+    }
+    logger.info("Melanjutkan task dari hari sebelumnya", {
+      ticket: suggestion.ticket,
+      project: suggestion.project?.project_name,
+      type: suggestion.type?.name,
+    });
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const errors = validateForm({
@@ -159,6 +188,36 @@ export function TaskForm({
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+      {continueSuggestions.length > 0 ? (
+        <section aria-label="Lanjutkan pekerjaan" className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+          {continueSuggestions.map((suggestion) => {
+            const label = suggestion.ticket || suggestion.project?.project_name || "task sebelumnya";
+            const summary = suggestion.summary.replace(/[.!?\s]+$/, "");
+            return (
+              <div key={suggestion.key} className="flex flex-wrap items-center justify-between gap-3">
+                <p className="min-w-0 flex-1 text-sm text-slate-700">
+                  Lanjutkan <span className="font-semibold text-ink">{label}</span>
+                  {summary ? (
+                    <>
+                      {" "}
+                      <span className="text-slate-600 line-clamp-2">{summary}</span>
+                    </>
+                  ) : null}?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => applyContinueSuggestion(suggestion)}
+                  disabled={loading || blocked || saving}
+                  aria-label={`Lanjutkan ${label}`}
+                  className="rounded-lg border border-brand/30 bg-white px-3 py-1.5 text-xs font-semibold text-brand hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                >
+                  Lanjutkan
+                </button>
+              </div>
+            );
+          })}
+        </section>
+      ) : null}
       {formError ? <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{formError}</p> : null}
       {loading ? <p className="text-sm text-slate-500" role="status">Memuat pilihan task...</p> : null}
 
@@ -260,6 +319,43 @@ export function TaskForm({
       </div>
     </form>
   );
+}
+
+type ContinueSuggestion = {
+  key: number;
+  ticket: string | null;
+  summary: string;
+  project: ProjectOption | null;
+  type: TaskTypeOption | null;
+};
+
+/**
+ * Mencocokkan saran "Lanjutkan" (yang membawa nama) dengan pilihan form (yang
+ * memakai id). Saran tanpa proyek yang cocok disembunyikan karena proyek wajib
+ * dipilih dan proyek tersebut mungkin sudah tidak aktif.
+ */
+function buildContinueSuggestions(
+  tasks: ContinueTask[],
+  projects: ProjectOption[],
+  taskTypes: TaskTypeOption[]
+): ContinueSuggestion[] {
+  return tasks.flatMap((task) => {
+    const project = projects.find((item) => namesMatch(item.project_name, task.project));
+    if (!project) return [];
+
+    return [{
+      key: task.id,
+      ticket: task.ticket,
+      summary: task.summary,
+      project,
+      type: taskTypes.find((item) => namesMatch(item.name, task.type)) ?? null,
+    }];
+  });
+}
+
+function namesMatch(option: string, suggestion: string | null) {
+  if (!suggestion) return false;
+  return option.trim().toLowerCase() === suggestion.trim().toLowerCase();
 }
 
 function statusForOption(option: WorkStatusOption): WorkStatus | undefined {
