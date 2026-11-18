@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TimelinePreview, dailyLogStatusLabel } from "@/components/preview/TimelinePreview";
 import { Dialog } from "@/components/shared/Dialog";
+import { ErrorNotice } from "@/components/shared/ErrorNotice";
 import { SidePanel } from "@/components/shared/SidePanel";
 import { SubmitHintDialog, type SubmitHintItem } from "@/components/shared/SubmitHintDialog";
 import { TaskForm, type TaskFormField } from "@/components/task/TaskForm";
+import { itemsFromApiError, type ErrorItem } from "@/lib/errorItems";
 import { ApiError } from "@/services/apiClient";
 import { logger } from "@/lib/logger";
 import { settingsService } from "@/services/settingsService";
@@ -28,11 +30,6 @@ type ConfirmDialogState = {
   confirmLabel: string;
   tone?: "default" | "danger";
   onConfirm: () => void;
-};
-
-type AlertDialogState = {
-  title: string;
-  message: string;
 };
 
 export function TaskShowcase() {
@@ -65,11 +62,15 @@ export function TaskShowcase() {
   const [lookupError, setLookupError] = useState("");
   const [formError, setFormError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<TaskFormField, string>>>({});
+  const [serverErrorItems, setServerErrorItems] = useState<ErrorItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
   const [notice, setNotice] = useState("");
   const [noticeIsError, setNoticeIsError] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
-  const [alertDialog, setAlertDialog] = useState<AlertDialogState | null>(null);
+  const deleteInProgressRef = useRef(false);
+  const deleteDialogActive = useRef(false);
   const requestId = useRef(0);
   const [serverToday, setServerToday] = useState<string | null>(null);
   // Hari aktif mengikuti server agar shift malam yang melewati tengah malam
@@ -101,8 +102,11 @@ export function TaskShowcase() {
         timeStyle: "short",
       }).format(new Date(dailyLogDeadline))
     : null;
-  const closeConfirmDialog = useCallback(() => setConfirmDialog(null), []);
-  const closeAlertDialog = useCallback(() => setAlertDialog(null), []);
+  const closeConfirmDialog = useCallback(() => {
+    setConfirmDialog(null);
+    setDeleteError("");
+    deleteDialogActive.current = false;
+  }, []);
 
   const loadDailyLog = useCallback(async () => {
     const currentRequestId = ++requestId.current;
@@ -278,6 +282,7 @@ const openNewTask = async (time?: string | number) => {
     setNotice("");
     setFormError("");
     setFieldErrors({});
+    setServerErrorItems([]);
     setEditingTask(null);
     let minute: number | undefined;
     if (typeof time === "number") {
@@ -351,6 +356,7 @@ const openNewTask = async (time?: string | number) => {
     setSaving(true);
     setFormError("");
     setFieldErrors({});
+    setServerErrorItems([]);
     try {
       const taskId = task.id ? Number(task.id) : null;
       if (taskId !== null) {
@@ -373,38 +379,40 @@ const openNewTask = async (time?: string | number) => {
         projectId: task.projectId ?? "-",
       });
     } catch (error) {
-      const validation = getFieldErrors(error);
-      const hasFieldErrors = Object.keys(validation.fields).length > 0;
-      logger.error("Gagal menyimpan task", error, {
-        mode,
-        taskId: task.id ?? "-",
-        dailyLogId,
-        fieldCount: Object.keys(validation.fields).length,
-      });
-      setFieldErrors(validation.fields);
-      setFormError(hasFieldErrors ? "" : validation.message);
-      setAlertDialog({
-        title: error instanceof ApiError && error.status === 400
-          ? "Periksa kembali data task"
-          : "Task belum dapat disimpan",
-        message: validation.message,
-      });
+      if (!(error instanceof ApiError)) {
+        logger.error("Gagal menyimpan task", error, {
+          mode,
+          taskId: task.id ?? "-",
+          dailyLogId,
+        });
+      }
+      setFormError("");
+      setFieldErrors({});
+      setServerErrorItems(toTaskErrorItems(error));
     } finally {
       setSaving(false);
     }
   };
 
   const performDeleteTask = async (taskId: number) => {
+    if (deleteInProgressRef.current) return;
+    deleteInProgressRef.current = true;
+    setDeleteInProgress(true);
+    setDeleteError("");
     try {
       await taskService.delete(taskId);
       const refreshed = await loadDailyLog();
       setNotice(refreshed ? "Task dihapus." : "Task dihapus, tetapi kalender belum dapat dimuat ulang.");
       setNoticeIsError(!refreshed);
       logger.info("Task dihapus", { taskId });
+      setConfirmDialog(null);
+      deleteDialogActive.current = false;
     } catch (error) {
-      logger.error("Gagal menghapus task", error, { taskId });
-      setNotice(getErrorMessage(error));
-      setNoticeIsError(true);
+      if (!(error instanceof ApiError)) logger.error("Gagal menghapus task", error, { taskId });
+      if (deleteDialogActive.current) setDeleteError(getErrorMessage(error));
+    } finally {
+      deleteInProgressRef.current = false;
+      setDeleteInProgress(false);
     }
   };
 
@@ -423,13 +431,14 @@ const openNewTask = async (time?: string | number) => {
       return;
     }
 
+    setDeleteError("");
+    deleteDialogActive.current = true;
     setConfirmDialog({
       title: "Hapus task?",
       description: "Task ini akan dihapus permanen dan tidak dapat dikembalikan.",
       confirmLabel: "Hapus task",
       tone: "danger",
       onConfirm: () => {
-        setConfirmDialog(null);
         void performDeleteTask(taskId);
       },
     });
@@ -577,6 +586,7 @@ const openNewTask = async (time?: string | number) => {
           setNotice("");
           setFormError("");
           setFieldErrors({});
+          setServerErrorItems([]);
           setEditingTask(task);
           setPanelOpen(true);
           logger.info("Membuka form edit task", { taskId: task.id ?? "-", startTime: task.startTime });
@@ -612,11 +622,19 @@ const openNewTask = async (time?: string | number) => {
           continueTasks={editingTask ? [] : continueTasks}
           onCancel={() => { setPanelOpen(false); setEditingTask(null); }}
           onSave={saveTask}
-          onFieldChange={(field) => setFieldErrors((current) => {
-            const next = { ...current };
-            delete next[field];
-            return next;
-          })}
+          onFieldChange={(field) => {
+            setFieldErrors((current) => {
+              const next = { ...current };
+              delete next[field];
+              return next;
+            });
+            setServerErrorItems((current) => current.filter((item) => item.field && item.field !== field));
+            setFormError("");
+          }}
+          onSubmitAttempt={() => {
+            setServerErrorItems((current) => current.filter((item) => item.field));
+            setFormError("");
+          }}
           projects={projects}
           taskTypes={masterData.types}
           workStatuses={masterData.statuses}
@@ -626,6 +644,7 @@ const openNewTask = async (time?: string | number) => {
           saving={saving}
           formError={formError}
           fieldErrors={fieldErrors}
+          serverErrorItems={serverErrorItems}
         />
       </SidePanel>
       {!panelOpen && !readOnly ? <button type="button" onClick={() => openNewTask()} className="fixed bottom-24 right-4 z-10 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 md:bottom-6 md:right-6">+ Tambah task</button> : null}
@@ -640,15 +659,14 @@ const openNewTask = async (time?: string | number) => {
         onCancel={closeConfirmDialog}
       >
         {confirmDialog?.description}
-      </Dialog>
-      <Dialog
-        open={alertDialog !== null}
-        title={alertDialog?.title ?? ""}
-        confirmLabel="Mengerti"
-        onConfirm={closeAlertDialog}
-        onCancel={closeAlertDialog}
-      >
-        {alertDialog?.message}
+        {confirmDialog?.title === "Hapus task?" && deleteError ? (
+          <ErrorNotice
+            variant="banner"
+            className="mt-3"
+            items={[{ id: "delete-error", message: deleteError, source: "server" }]}
+          />
+        ) : null}
+        {deleteInProgress ? <span className="sr-only" role="status">Menghapus task...</span> : null}
       </Dialog>
       <SubmitHintDialog
         open={hintDialog !== null}
@@ -724,41 +742,29 @@ function getErrorMessage(error: unknown) {
 
 const apiFieldMap: Record<string, TaskFormField> = {
   projectId: "project",
-  taskTypeId: "type",
-  workStatusId: "status",
+  ticket: "ticket",
   startTime: "startTime",
   durationMinutes: "duration",
+  taskTypeId: "type",
   summary: "summary",
-  ticket: "ticket",
+  workStatusId: "status",
+};
+const taskFieldLabels: Record<TaskFormField, string> = {
+  project: "Proyek",
+  ticket: "Tiket",
+  startTime: "Mulai",
+  duration: "Durasi",
+  type: "Jenis task",
+  summary: "Ringkasan",
+  status: "Status",
 };
 
-function getFieldErrors(error: unknown) {
-  const message = getErrorMessage(error);
-  const normalized = message.toLowerCase();
-  const fields: Partial<Record<TaskFormField, string>> = {};
-
-  if (error instanceof ApiError) {
-    for (const [field, fieldMessage] of Object.entries(error.fieldErrors)) {
-      const mappedField = apiFieldMap[field];
-      if (mappedField) fields[mappedField] = fieldMessage;
-    }
-  }
-
-  const map: Array<[TaskFormField, string[]]> = [
-    ["project", ["project", "proyek"]],
-    ["ticket", ["ticket", "tiket"]],
-    ["startTime", ["start time", "jam mulai", "waktu mulai"]],
-    ["duration", ["duration", "durasi"]],
-    ["type", ["task type", "jenis task"]],
-    ["summary", ["summary", "ringkasan"]],
-    ["status", ["work status", "status pekerjaan"]],
-  ];
-  for (const [field, markers] of map) {
-    if (!fields[field] && markers.some((marker) => normalized.includes(marker))) {
-      fields[field] = message;
-    }
-  }
-
-  const firstFieldMessage = Object.values(fields).find(Boolean);
-  return { fields, message: firstFieldMessage ?? message };
+function toTaskErrorItems(error: unknown): ErrorItem[] {
+  return itemsFromApiError(error, (field) => {
+    const formField = apiFieldMap[field];
+    return formField ? taskFieldLabels[formField] : undefined;
+  }).map((item) => ({
+    ...item,
+    field: item.field ? apiFieldMap[item.field] : undefined,
+  }));
 }
