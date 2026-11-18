@@ -66,6 +66,21 @@ describe("logbook-log route", () => {
     });
   });
 
+  it("preserves 1,000-character error stacks during server-side redaction", async () => {
+    const POST = await loadPost();
+    const errorStack = "s".repeat(1_000);
+
+    const response = await POST(request({
+      level: "error",
+      event: "task.failed",
+      context: { errorStack },
+    }));
+
+    expect(response.status).toBe(204);
+    const line = appendFileMock.mock.calls[0][1] as string;
+    expect(JSON.parse(line).context).toEqual({ errorStack });
+  });
+
   it("rejects request bodies larger than 16 KiB", async () => {
     const POST = await loadPost();
     const response = await POST(new Request("https://example.test/logbook-log", {

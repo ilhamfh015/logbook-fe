@@ -207,8 +207,7 @@ describe("logger thresholds and payload safety", () => {
     });
   });
 
-  // redactValue truncates this already-capped stack to 500 characters.
-  it.fails("truncates error stacks to 1,000 characters and includes the error name and message", async () => {
+  it("truncates error stacks to 1,000 characters and includes the error name and message", async () => {
     vi.stubEnv("NEXT_PUBLIC_LOG_LEVEL", "error");
     const logger = await loadLogger();
     const error = new Error("failure message");

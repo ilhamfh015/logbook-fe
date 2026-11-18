@@ -15,7 +15,25 @@ describe("log redaction", () => {
   });
 
   it("truncates strings longer than 500 characters", () => {
-    expect(redactValue("x".repeat(501))).toBe(`${"x".repeat(500)}…`);
+    expect(redactValue("x".repeat(600))).toBe(`${"x".repeat(500)}…`);
+  });
+
+  it("preserves error stacks up to 1,000 characters and truncates longer ones", () => {
+    expect(redactValue({ errorStack: "s".repeat(1_000) })).toEqual({
+      errorStack: "s".repeat(1_000),
+    });
+    expect(redactValue({ errorStack: "s".repeat(1_500) })).toEqual({
+      errorStack: `${"s".repeat(1_000)}…`,
+    });
+    expect(redactValue({ ErrorStack: "s".repeat(1_000) })).toEqual({
+      ErrorStack: "s".repeat(1_000),
+    });
+  });
+
+  it("keeps the 500-character limit for keys that only resemble errorStack", () => {
+    expect(redactValue({ stackTrace: "s".repeat(600) })).toEqual({
+      stackTrace: `${"s".repeat(500)}…`,
+    });
   });
 
   it("replaces circular references without throwing", () => {
