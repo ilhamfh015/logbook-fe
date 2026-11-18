@@ -18,6 +18,7 @@ const SENSITIVE_KEY_PARTS = [
 const MAX_DEPTH = 4;
 const MAX_ARRAY_LENGTH = 20;
 const MAX_STRING_LENGTH = 500;
+const MAX_ERROR_STACK_LENGTH = 1_000;
 const EMAIL_PATTERN = /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@([A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?)+)$/i;
 
 export function redactValue(value: unknown, depth = 0): unknown {
@@ -28,14 +29,19 @@ export function redactValue(value: unknown, depth = 0): unknown {
   }
 }
 
-function redact(value: unknown, depth: number, seen: WeakSet<object>): unknown {
+function redact(
+  value: unknown,
+  depth: number,
+  seen: WeakSet<object>,
+  maxStringLength = MAX_STRING_LENGTH,
+): unknown {
   if (depth > MAX_DEPTH) return "[terlalu dalam]";
 
   if (typeof value === "string") {
     const email = EMAIL_PATTERN.exec(value);
     if (email) return `${value[0]}***@${email[1]}`;
-    return value.length > MAX_STRING_LENGTH
-      ? `${value.slice(0, MAX_STRING_LENGTH)}…`
+    return value.length > maxStringLength
+      ? `${value.slice(0, maxStringLength)}…`
       : value;
   }
 
@@ -63,7 +69,12 @@ function redact(value: unknown, depth: number, seen: WeakSet<object>): unknown {
       const normalizedKey = key.toLowerCase();
       result[key] = SENSITIVE_KEY_PARTS.some((part) => normalizedKey.includes(part))
         ? "[disembunyikan]"
-        : redact(nestedValue, depth + 1, seen);
+        : redact(
+            nestedValue,
+            depth + 1,
+            seen,
+            normalizedKey === "errorstack" ? MAX_ERROR_STACK_LENGTH : MAX_STRING_LENGTH,
+          );
     }
   } catch {
     return "[tidak dapat dibaca]";
