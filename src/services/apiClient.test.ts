@@ -235,4 +235,33 @@ describe("apiFetch interceptor", () => {
     expect(warnLog).toHaveBeenCalledTimes(1);
     expect(errorLog).toHaveBeenCalledTimes(1);
   });
+
+  it("uses the default 5xx message when the backend message is empty", async () => {
+    fetchMock.mockResolvedValue(mockResponse(503, { message: "   ", error: "" }));
+
+    await expect(apiFetch("/api/unavailable")).rejects.toMatchObject({
+      status: 503,
+      kind: "http",
+      message: "Terjadi kesalahan pada server. Silakan coba lagi nanti.",
+    });
+    expect(errorLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("never includes the response body in failure logs", async () => {
+    fetchMock.mockResolvedValue(mockResponse(400, {
+      message: "Permintaan tidak valid.",
+      body: "private response payload",
+      details: "backend-only response detail",
+    }));
+
+    await expect(apiFetch("/api/data")).rejects.toBeInstanceOf(ApiError);
+
+    const allLogs = JSON.stringify({
+      debug: debugLog.mock.calls,
+      warn: warnLog.mock.calls,
+      error: errorLog.mock.calls,
+    });
+    expect(allLogs).not.toContain("private response payload");
+    expect(allLogs).not.toContain("backend-only response detail");
+  });
 });
