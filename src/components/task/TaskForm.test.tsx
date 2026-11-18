@@ -269,4 +269,41 @@ describe("TaskForm", () => {
 
     expect(screen.getByRole("alert")).toHaveClass("border-red-200", "bg-red-50", "text-red-700");
   });
+
+  it("shows saving state on the save button and disables cancel", () => {
+    renderTaskForm(vi.fn(async () => undefined), { saving: true });
+
+    expect(screen.getByRole("button", { name: "Menyimpan..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Batal" })).toBeDisabled();
+  });
+
+  it("disables inputs while loading and shows loading status", () => {
+    renderTaskForm(vi.fn(async () => undefined), { loading: true });
+
+    expect(screen.getByText("Memuat pilihan task...")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Simpan task" })).toBeDisabled();
+  });
+
+  it("disables save button when project list is empty", () => {
+    renderTaskForm(vi.fn(async () => undefined), { projects: [] });
+
+    expect(screen.getByRole("button", { name: "Simpan task" })).toBeDisabled();
+    expect(screen.getByText("Belum ada proyek yang tersedia.")).toBeInTheDocument();
+  });
+
+  it("calls onCancel when cancel button is clicked", async () => {
+    const { user, onCancel } = renderTaskForm();
+
+    await user.click(screen.getByRole("button", { name: "Batal" }));
+
+    expect(onCancel).toHaveBeenCalled();
+  });
+
+  it("does not show ticket format error for a valid ticket", async () => {
+    const { user } = renderTaskForm();
+
+    await user.type(screen.getByRole("textbox", { name: /Tiket/ }), "ABC-142");
+
+    expect(screen.queryByText("Format tiket tidak valid. Contoh: ABC-154")).not.toBeInTheDocument();
+  });
 });

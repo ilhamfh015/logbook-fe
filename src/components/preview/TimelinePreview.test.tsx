@@ -183,4 +183,236 @@ describe("TimelinePreview", () => {
     expect(screen.getByRole("button", { name: /Development/ })).toBeInTheDocument();
     expect(screen.getByText("1 task")).toBeInTheDocument();
   });
+
+  it("memanggil onChangeDate dengan tanggal sebelumnya saat tombol hari sebelumnya diklik", async () => {
+    const user = userEvent.setup();
+    const onChangeDate = vi.fn();
+    render(
+      <TimelinePreview
+        date={new Date("2026-11-17T00:00:00")}
+        onChangeDate={onChangeDate}
+        onAddTask={vi.fn()}
+        savedTasks={[]}
+        previousDayTasks={[]}
+        onEditTask={vi.fn()}
+        onDeleteTask={vi.fn()}
+        loading={false}
+        emptyMessage=""
+        status="DRAF"
+        day={null}
+        submittedAt={null}
+        readOnly={false}
+        lockMessage={null}
+        deadlineLabel={null}
+        rejectionReason={null}
+        canWithdraw={false}
+        canSubmit={false}
+        submitting={false}
+        onSubmit={vi.fn()}
+        withdrawing={false}
+        onWithdraw={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Hari sebelumnya" }));
+
+    expect(onChangeDate).toHaveBeenCalledOnce();
+    const nextDate = onChangeDate.mock.calls[0][0] as Date;
+    expect(nextDate.getDate()).toBe(16);
+  });
+
+  it("memanggil onChangeDate dengan tanggal berikutnya saat tombol hari berikutnya diklik", async () => {
+    const user = userEvent.setup();
+    const onChangeDate = vi.fn();
+    render(
+      <TimelinePreview
+        date={new Date("2026-11-17T00:00:00")}
+        onChangeDate={onChangeDate}
+        onAddTask={vi.fn()}
+        savedTasks={[]}
+        previousDayTasks={[]}
+        onEditTask={vi.fn()}
+        onDeleteTask={vi.fn()}
+        loading={false}
+        emptyMessage=""
+        status="DRAF"
+        day={null}
+        submittedAt={null}
+        readOnly={false}
+        lockMessage={null}
+        deadlineLabel={null}
+        rejectionReason={null}
+        canWithdraw={false}
+        canSubmit={false}
+        submitting={false}
+        onSubmit={vi.fn()}
+        withdrawing={false}
+        onWithdraw={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Hari berikutnya" }));
+
+    expect(onChangeDate).toHaveBeenCalledOnce();
+    const nextDate = onChangeDate.mock.calls[0][0] as Date;
+    expect(nextDate.getDate()).toBe(18);
+  });
+
+  it("menampilkan label Libur nasional ketika day.holidayName ada", () => {
+    render(
+      <TimelinePreview
+        date={new Date("2026-11-17T00:00:00")}
+        onChangeDate={vi.fn()}
+        onAddTask={vi.fn()}
+        savedTasks={[]}
+        previousDayTasks={[]}
+        onEditTask={vi.fn()}
+        onDeleteTask={vi.fn()}
+        loading={false}
+        emptyMessage=""
+        status="DRAF"
+        day={{ date: "2026-11-17", workingDay: false, holidayName: "Hari Kemerdekaan", onLeave: false, weekend: false }}
+        submittedAt={null}
+        readOnly={false}
+        lockMessage={null}
+        deadlineLabel={null}
+        rejectionReason={null}
+        canWithdraw={false}
+        canSubmit={false}
+        submitting={false}
+        onSubmit={vi.fn()}
+        withdrawing={false}
+        onWithdraw={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Libur: Hari Kemerdekaan")).toBeInTheDocument();
+  });
+
+  it("menampilkan label Cuti ketika day.onLeave true", () => {
+    render(
+      <TimelinePreview
+        date={new Date("2026-11-17T00:00:00")}
+        onChangeDate={vi.fn()}
+        onAddTask={vi.fn()}
+        savedTasks={[]}
+        previousDayTasks={[]}
+        onEditTask={vi.fn()}
+        onDeleteTask={vi.fn()}
+        loading={false}
+        emptyMessage=""
+        status="DRAF"
+        day={{ date: "2026-11-17", workingDay: false, holidayName: null, onLeave: true, weekend: false }}
+        submittedAt={null}
+        readOnly={false}
+        lockMessage={null}
+        deadlineLabel={null}
+        rejectionReason={null}
+        canWithdraw={false}
+        canSubmit={false}
+        submitting={false}
+        onSubmit={vi.fn()}
+        withdrawing={false}
+        onWithdraw={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Cuti")).toBeInTheDocument();
+  });
+
+  it("menampilkan label Akhir pekan ketika day.weekend true", () => {
+    render(
+      <TimelinePreview
+        date={new Date("2026-11-17T00:00:00")}
+        onChangeDate={vi.fn()}
+        onAddTask={vi.fn()}
+        savedTasks={[]}
+        previousDayTasks={[]}
+        onEditTask={vi.fn()}
+        onDeleteTask={vi.fn()}
+        loading={false}
+        emptyMessage=""
+        status="DRAF"
+        day={{ date: "2026-11-17", workingDay: false, holidayName: null, onLeave: false, weekend: true }}
+        submittedAt={null}
+        readOnly={false}
+        lockMessage={null}
+        deadlineLabel={null}
+        rejectionReason={null}
+        canWithdraw={false}
+        canSubmit={false}
+        submitting={false}
+        onSubmit={vi.fn()}
+        withdrawing={false}
+        onWithdraw={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Akhir pekan")).toBeInTheDocument();
+  });
+
+  it("menampilkan lockMessage ketika readOnly", () => {
+    render(
+      <TimelinePreview
+        date={new Date("2026-11-17T00:00:00")}
+        onChangeDate={vi.fn()}
+        onAddTask={vi.fn()}
+        savedTasks={[]}
+        previousDayTasks={[]}
+        onEditTask={vi.fn()}
+        onDeleteTask={vi.fn()}
+        loading={false}
+        emptyMessage=""
+        status="DRAF"
+        day={null}
+        submittedAt={null}
+        readOnly={true}
+        lockMessage="Tanggal ini sudah lewat sehingga Daily Log terkunci."
+        deadlineLabel={null}
+        rejectionReason={null}
+        canWithdraw={false}
+        canSubmit={false}
+        submitting={false}
+        onSubmit={vi.fn()}
+        withdrawing={false}
+        onWithdraw={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Tanggal ini sudah lewat sehingga Daily Log terkunci.")).toBeInTheDocument();
+  });
+
+  it("membagi 2 task yang overlap menjadi 2 kolom proporsional", () => {
+    renderTimeline({
+      savedTasks: [
+        {
+          id: "1",
+          project: "Alpha",
+          projectColor: "blue",
+          ticket: "",
+          startTime: "08:00",
+          durationMinutes: 60,
+          type: "Development",
+          summary: "Task pertama",
+          workStatus: "BERJALAN",
+        },
+        {
+          id: "2",
+          project: "Beta",
+          projectColor: "blue",
+          ticket: "",
+          startTime: "08:00",
+          durationMinutes: 60,
+          type: "Development",
+          summary: "Task kedua",
+          workStatus: "BERJALAN",
+        },
+      ],
+    });
+
+    const tasks = screen.getAllByRole("button", { name: /Development/ });
+    expect(tasks).toHaveLength(2);
+    expect(tasks[0]).toHaveStyle({ gridColumn: "1" });
+    expect(tasks[1]).toHaveStyle({ gridColumn: "2" });
+  });
 });

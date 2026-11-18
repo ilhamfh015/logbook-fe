@@ -112,6 +112,7 @@ export function TaskForm({
 }: TaskFormProps) {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [dismissedGeneralSignature, setDismissedGeneralSignature] = useState("");
+  const [dismissedContinueKeys, setDismissedContinueKeys] = useState<Set<number>>(new Set());
   const previousServerErrorSignature = useRef("");
   const [projectId, setProjectId] = useState("");
   const [typeId, setTypeId] = useState("");
@@ -226,9 +227,16 @@ export function TaskForm({
   // form sudah berasal dari task yang dipilih.
   const continueSuggestions = initialTask
     ? []
-    : buildContinueSuggestions(continueTasks, projects, taskTypes);
+    : buildContinueSuggestions(continueTasks, projects, taskTypes).filter(
+        (suggestion) => !dismissedContinueKeys.has(suggestion.key),
+      );
 
   const applyContinueSuggestion = (suggestion: ContinueSuggestion) => {
+    setDismissedContinueKeys((previous) => {
+      const next = new Set(previous);
+      next.add(suggestion.key);
+      return next;
+    });
     if (suggestion.project) {
       setProjectId(String(suggestion.project.project_id));
       notifyFieldChange("project");

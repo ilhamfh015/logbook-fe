@@ -29,7 +29,7 @@ type TimelineTask = {
   tone: ProjectColor;
   startSlot: number;
   durationSlots: number;
-  column: "full" | "left" | "middle" | "right";
+  column: number;
   badge?: string;
   sourceTask?: TaskDraft;
   persisted?: boolean;
@@ -567,7 +567,7 @@ function SegmentGrid({
     marks.push({ minute: segment.endMinute, label: formatBoundary(segment.endMinute) });
     return marks;
   })();
-  const positioned = positionTasks(segment, spillLabel);
+  const { positioned, columns } = positionTasks(segment, spillLabel);
   const breakRow = showBreak ? (12 * 60 - segment.startMinute) / SLOT_MINUTES + 1 : null;
 
   return (
@@ -597,8 +597,9 @@ function SegmentGrid({
         })}
       </div>
       <div
-        className="relative grid min-w-0 grid-cols-3 gap-x-1.5 sm:gap-x-2"
+        className="relative grid min-w-0 gap-x-1.5 sm:gap-x-2"
         style={{
+          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
           gridTemplateRows: `repeat(${slots}, minmax(0, 40px)) 24px`,
         }}
       >
@@ -612,7 +613,7 @@ function SegmentGrid({
                   aria-label={`Tambah task pukul ${formatClock(slotStart)}`}
                   onClick={() => onAddTask(slotStart)}
                   disabled={readOnly}
-                  className={`col-span-3 h-full border-t border-slate-100 bg-transparent text-left ${
+                  className={`col-span-full h-full border-t border-slate-100 bg-transparent text-left ${
                     readOnly
                       ? "cursor-not-allowed"
                       : "cursor-pointer hover:bg-blue-50/40"
@@ -672,7 +673,7 @@ function toTimelineTask(
     tone: entry.task.projectColor,
     startSlot,
     durationSlots,
-    column: "full",
+    column: 0,
     badge: entry.spill ? `Lanjutan ${spillLabel}` : workStatusBadge,
     sourceTask: entry.task,
     persisted: Boolean(entry.task.id),
@@ -683,6 +684,7 @@ function toTimelineTask(
 
 function positionTasks(segment: TimelineSegment, spillLabel: string) {
   const positioned: TimelineTask[] = [];
+  let maxColumn = 0;
 
   for (const entry of segment.tasks) {
     const task = toTimelineTask(entry, segment, spillLabel);
@@ -696,26 +698,27 @@ function positionTasks(segment: TimelineSegment, spillLabel: string) {
     });
 
     if (!hasOverlap) {
-      positioned.push({ ...task, column: "full" });
+      positioned.push({ ...task, column: 0 });
       continue;
     }
 
-    const availableColumns = ["left", "middle", "right"] as const;
-    const column =
-      availableColumns.find(
-        (candidate) =>
-          !positioned.some(
-            (placed) =>
-              placed.column === candidate &&
-              task.startSlot < placed.startSlot + placed.durationSlots &&
-              placed.startSlot < task.startSlot + task.durationSlots,
-          ),
-      ) ?? "right";
+    let column = 1;
+    while (
+      positioned.some(
+        (placed) =>
+          placed.column === column &&
+          task.startSlot < placed.startSlot + placed.durationSlots &&
+          placed.startSlot < task.startSlot + task.durationSlots,
+      )
+    ) {
+      column += 1;
+    }
 
+    if (column > maxColumn) maxColumn = column;
     positioned.push({ ...task, column });
   }
 
-  return positioned;
+  return { positioned, columns: Math.max(1, maxColumn) };
 }
 
 export function dailyLogStatusLabel(status: string | null) {
@@ -785,14 +788,7 @@ function TimelineBlock({
   ]
     .filter(Boolean)
     .join(" · ");
-  const gridColumn =
-    task.column === "full"
-      ? "1 / -1"
-      : task.column === "left"
-        ? "1"
-        : task.column === "middle"
-          ? "2"
-          : "3";
+  const gridColumn = task.column === 0 ? "1 / -1" : String(task.column);
   return (
     <article
       onClick={
