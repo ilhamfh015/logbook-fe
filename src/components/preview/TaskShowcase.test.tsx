@@ -66,10 +66,16 @@ const shortSummaryHint = {
   message: "Ringkasan task baru 10 karakter. Disarankan minimal 20 karakter.",
 };
 
+const longTaskHint = {
+  taskId: 7,
+  kind: "TASK_PANJANG" as const,
+  message: "Durasi task 300 menit melebihi 240 menit. Pertimbangkan memecahnya menjadi beberapa task.",
+};
+
 async function renderShowcase() {
   const user = userEvent.setup();
   render(<TaskShowcase />);
-  await screen.findByRole("button", { name: "Kirim Daily Log" });
+  await screen.findByRole("button", { name: "Kirim Daily Log" }, { timeout: 5000 });
   return user;
 }
 
@@ -117,6 +123,25 @@ describe("TaskShowcase submit hints", () => {
     expect(within(dialog).getByText(/Ringkasan pendek/)).toBeInTheDocument();
     expect(within(dialog).getByText(shortSummaryHint.message)).toBeInTheDocument();
     expect(mocked.submitDailyLog).not.toHaveBeenCalled();
+  });
+
+  it("shows the task summary when the task has no ticket", async () => {
+    mocked.getDailyLog.mockResolvedValue({
+      ...draftDailyLog,
+      tasks: [{ ...draftDailyLog.tasks[0], ticket: "", summary: "cek" }],
+    });
+    mocked.checkSubmit.mockResolvedValue({ hints: [shortSummaryHint, longTaskHint] });
+    const user = await renderShowcase();
+
+    await user.click(screen.getByRole("button", { name: "Kirim Daily Log" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    const labels = within(dialog).getAllByText(/Task "cek"/);
+    const labelText = labels.map((label) => label.textContent).join(" ");
+    expect(labels).toHaveLength(2);
+    expect(labelText).toContain("Ringkasan pendek");
+    expect(labelText).toContain("Durasi panjang");
+    expect(within(dialog).queryByText(/Task #7/)).not.toBeInTheDocument();
   });
 
   it("sends anyway when the talent chooses Kirim saja", async () => {

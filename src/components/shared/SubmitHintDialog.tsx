@@ -4,9 +4,12 @@ import { Dialog } from "@/components/shared/Dialog";
 import type { SubmitHint } from "@/services/taskService";
 
 /**
- * Saran yang sudah dilengkapi tiket task agar mudah dikenali talent.
+ * Saran yang sudah dilengkapi identitas task agar mudah dikenali talent.
  */
-export type SubmitHintItem = SubmitHint & { ticket: string | null };
+export type SubmitHintItem = SubmitHint & {
+  ticket: string | null;
+  summary: string | null;
+};
 
 type SubmitHintDialogProps = {
   open: boolean;
@@ -48,7 +51,7 @@ export function SubmitHintDialog({
             className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900"
           >
             <p className="text-xs font-semibold uppercase tracking-wide">
-              {hint.ticket ? `Task ${hint.ticket}` : `Task #${hint.taskId}`}
+              {taskIdentity(hint)}
               {" · "}
               {hintKindLabel(hint.kind)}
             </p>
@@ -64,6 +67,22 @@ const hintKindLabels: Record<string, string> = {
   RINGKASAN_PENDEK: "Ringkasan pendek",
   TASK_PANJANG: "Durasi panjang",
 };
+
+const taskSummaryMaxLength = 32;
+
+function taskIdentity(hint: SubmitHintItem): string {
+  const ticket = hint.ticket?.trim();
+  if (ticket) return `Task ${ticket}`;
+
+  const summary = hint.summary?.trim();
+  if (summary) return `Task "${truncate(summary, taskSummaryMaxLength)}"`;
+
+  return `Task #${hint.taskId}`;
+}
+
+function truncate(value: string, maxLength: number): string {
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
+}
 
 function hintKindLabel(kind: string) {
   return hintKindLabels[kind] ?? "Saran";

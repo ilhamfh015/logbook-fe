@@ -502,7 +502,7 @@ const openNewTask = async (time?: string | number) => {
     try {
       const check = await taskService.checkSubmit(id);
       if (check.hints.length > 0) {
-        setHintDialog({ id, isResubmit, hints: withTickets(check.hints, savedTasks) });
+        setHintDialog({ id, isResubmit, hints: withTaskIdentity(check.hints, savedTasks) });
         return;
       }
     } catch (error) {
@@ -661,14 +661,18 @@ const openNewTask = async (time?: string | number) => {
 }
 
 /**
- * Melengkapi saran dengan tiket task yang sedang tampil supaya talent langsung
- * mengenali task yang dimaksud.
+ * Melengkapi saran dengan identitas task yang sedang tampil supaya talent
+ * langsung mengenali task yang dimaksud, meskipun tiketnya kosong.
  */
-function withTickets(hints: SubmitHint[], tasks: TaskFormDraft[]): SubmitHintItem[] {
-  return hints.map((hint) => ({
-    ...hint,
-    ticket: tasks.find((task) => Number(task.id) === hint.taskId)?.ticket || null,
-  }));
+function withTaskIdentity(hints: SubmitHint[], tasks: TaskFormDraft[]): SubmitHintItem[] {
+  return hints.map((hint) => {
+    const task = tasks.find((task) => Number(task.id) === hint.taskId);
+    return {
+      ...hint,
+      ticket: task?.ticket?.trim() || null,
+      summary: task?.summary?.trim() || null,
+    };
+  });
 }
 
 function toTaskDraft(task: DailyLog["tasks"][number], projects: ProjectOption[], masterData: TaskMasterData): TaskFormDraft {
