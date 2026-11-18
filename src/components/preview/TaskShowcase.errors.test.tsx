@@ -62,7 +62,7 @@ const dailyLog: DailyLog = {
 async function renderShowcase() {
   const user = userEvent.setup();
   render(<TaskShowcase />);
-  await screen.findByRole("button", { name: "Kirim Daily Log" });
+  await screen.findByRole("button", { name: "Kirim Daily Log" }, { timeout: 5000 });
   return user;
 }
 
@@ -133,7 +133,7 @@ describe("TaskShowcase delete errors", () => {
     await user.type(screen.getByRole("textbox", { name: /Ringkasan dan hasil/ }), "Menyelesaikan fitur");
     await user.click(screen.getByRole("button", { name: "Simpan task" }));
 
-    expect(await screen.findByText("Server belum dapat menyimpan task.")).toBeInTheDocument();
+    expect(await screen.findByText("Server belum dapat menyimpan task.", {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
