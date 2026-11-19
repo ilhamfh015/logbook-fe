@@ -102,6 +102,12 @@ export function AdminLeaveHolidayPage() {
     () => new Set(holidays.map((holiday) => dateOnly(holiday.holiday_date))),
     [holidays],
   );
+  const talentNamesById = useMemo(
+    () => new Map(talents.map((talent) => [talent.id, talent.full_name])),
+    [talents],
+  );
+  const leaveTalentName = (leave: AdminLeave) =>
+    leave.full_name || talentNamesById.get(leave.user_id) || "—";
 
   const handleAddHoliday = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -343,7 +349,7 @@ export function AdminLeaveHolidayPage() {
               <tbody className="divide-y divide-slate-100">
                 {leaves.map((leave) => (
                   <tr key={leave.id} className="hover:bg-slate-50/70">
-                    <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-ink">{leave.full_name}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-ink">{leaveTalentName(leave)}</td>
                     <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">{formatDate(leave.start_date)}</td>
                     <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">{formatDate(leave.end_date)}</td>
                     <td className="px-4 py-3.5 text-slate-600">
@@ -356,9 +362,9 @@ export function AdminLeaveHolidayPage() {
                         onClick={() => setDeleteTarget({
                           type: "leave",
                           id: leave.id,
-                          label: `${leave.full_name} (${formatDate(leave.start_date)})`,
+                          label: `${leaveTalentName(leave)} (${formatDate(leave.start_date)})`,
                         })}
-                        aria-label={`Hapus cuti ${leave.full_name}`}
+                        aria-label={`Hapus cuti ${leaveTalentName(leave)}`}
                         className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
                       >
                         <Trash2 size={14} /> Hapus

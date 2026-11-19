@@ -14,7 +14,7 @@ export type AdminTalent = {
 export type AdminLeave = {
   id: number;
   user_id: number;
-  full_name: string;
+  full_name: string | null;
   start_date: string;
   end_date: string;
   note: string | null;
