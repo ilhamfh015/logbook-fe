@@ -11,6 +11,18 @@ export type UserSettingsApi = {
   activeDate: string | null;
 };
 
+export type UserSettingsUpdate = {
+  workStart?: string;
+  workEnd?: string;
+  onboarded?: boolean;
+};
+
 export const settingsService = {
   getSettings: () => apiFetch<UserSettingsApi>("/api/settings"),
+
+  updateSettings: (update: UserSettingsUpdate) =>
+    apiFetch<UserSettingsApi>("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify(update),
+    }),
 };

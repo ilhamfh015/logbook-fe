@@ -1,5 +1,17 @@
-import { ComingSoonPage } from "@/components/layout/ComingSoonPage";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { SettingsPageContent } from "@/components/settings/SettingsPageContent";
 
 export default function SettingsPage() {
-  return <ComingSoonPage title="Pengaturan" description="Pengaturan jam kerja dan preferensi Log Book akan tersedia di sini." />;
+  return (
+    <main className="min-h-screen bg-surface text-ink">
+      <div className="flex min-h-screen w-full">
+        <AppSidebar activeItem="pengaturan" />
+        <section className="min-w-0 flex-1">
+          <AppHeader />
+          <SettingsPageContent />
+        </section>
+      </div>
+    </main>
+  );
 }

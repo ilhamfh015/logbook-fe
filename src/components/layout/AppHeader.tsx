@@ -19,6 +19,7 @@ export function AppHeader() {
 
   const isAtasanPage = pathname.startsWith("/atasan");
   const isAdminPage = pathname.startsWith("/admin");
+  const isSettingsPage = pathname.startsWith("/pengaturan");
 
   const roleLabel = user?.roles.includes("ATASAN")
     ? "Atasan"
@@ -79,7 +80,13 @@ export function AppHeader() {
         <FileText size={16} />
         <span aria-hidden="true">›</span>
         <span className="font-medium text-ink">
-          {isAtasanPage ? "Tim" : isAdminPage ? "Libur & Cuti" : "Log Book"}
+          {isSettingsPage
+            ? "Pengaturan"
+            : isAtasanPage
+              ? "Tim"
+              : isAdminPage
+                ? "Libur & Cuti"
+                : "Log Book"}
         </span>
       </div>
 
