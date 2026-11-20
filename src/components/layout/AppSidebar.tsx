@@ -5,9 +5,15 @@ import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 type AppSidebarProps = {
-  activeItem?: "logbook" | "jejak" | "panduan" | "pengaturan" | "tim" | "libur-cuti";
+  activeItem?:
+    | "logbook"
+    | "jejak"
+    | "panduan"
+    | "pengaturan"
+    | "tim"
+    | "libur-cuti"
+    | "pengguna";
 };
-
 export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
   const { user } = useAuth();
   const isAtasanPage = activeItem === "tim";
@@ -85,6 +91,7 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
                   <Settings size={19} />
                   Pengaturan
                 </Link>
+
               </>
             ) : (
               <>
@@ -156,6 +163,18 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
                   <CalendarOff size={19} />
                   Libur &amp; Cuti
                 </Link>
+                <Link
+                  href="/admin/pengguna"
+                  aria-current={activeItem === "pengguna" ? "page" : undefined}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
+                    activeItem === "pengguna"
+                      ? "bg-blue-100 font-semibold text-brand"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <Users size={19} />
+                  Pengguna
+                </Link>
               </>
             ) : null}
           </nav>
@@ -172,7 +191,7 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
       </aside>
 
       <nav
-        className={`fixed inset-x-3 bottom-3 z-10 grid ${isAdmin ? "grid-cols-5" : "grid-cols-4"} rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-[11px] font-medium shadow-lg backdrop-blur md:hidden`}
+        className={`fixed inset-x-3 bottom-3 z-10 grid ${isAdmin ? "grid-cols-6" : "grid-cols-4"} rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-[11px] font-medium shadow-lg backdrop-blur md:hidden`}
         aria-label="Navigasi utama"
       >
         {isAtasanPage ? (
@@ -217,16 +236,28 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
           </>
         )}
         {isAdmin ? (
-          <Link
-            href="/admin/libur-cuti"
-            aria-current={activeItem === "libur-cuti" ? "page" : undefined}
-            className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${
-              activeItem === "libur-cuti" ? "bg-blue-50 text-brand" : "text-slate-600"
-            }`}
-          >
-            <CalendarOff size={18} />
-            Libur &amp; Cuti
-          </Link>
+          <>
+            <Link
+              href="/admin/libur-cuti"
+              aria-current={activeItem === "libur-cuti" ? "page" : undefined}
+              className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${
+                activeItem === "libur-cuti" ? "bg-blue-50 text-brand" : "text-slate-600"
+              }`}
+            >
+              <CalendarOff size={18} />
+              Libur &amp; Cuti
+            </Link>
+            <Link
+              href="/admin/pengguna"
+              aria-current={activeItem === "pengguna" ? "page" : undefined}
+              className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${
+                activeItem === "pengguna" ? "bg-blue-50 text-brand" : "text-slate-600"
+              }`}
+            >
+              <Users size={18} />
+              Pengguna
+            </Link>
+          </>
         ) : null}
       </nav>
     </>

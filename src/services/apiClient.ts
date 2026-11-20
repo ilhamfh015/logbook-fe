@@ -1,3 +1,4 @@
+
 import { logger } from "@/lib/logger";
 import { stripQuery } from "@/lib/logRedaction";
 
@@ -44,7 +45,9 @@ function createRequestId(): string {
   } catch {
     // Use the random fallback when the browser crypto API is unavailable.
   }
-  return Math.floor(Math.random() * 0x1_0000_0000).toString(16).padStart(8, "0");
+  return Math.floor(Math.random() * 0x1_0000_0000)
+    .toString(16)
+    .padStart(8, "0");
 }
 
 function defaultErrorMessage(status: number): string {
@@ -95,7 +98,12 @@ function logFailure(
   }
 }
 
-function createTimeoutError(method: string, path: string, startedAt: number, requestId: string) {
+function createTimeoutError(
+  method: string,
+  path: string,
+  startedAt: number,
+  requestId: string,
+) {
   const apiError = new ApiError(
     0,
     "Server terlalu lama merespons. Silakan coba lagi.",
@@ -120,8 +128,11 @@ function readErrorDetails(body: unknown) {
       field?: unknown;
       fieldErrors?: unknown;
     };
-    if (typeof errorBody.message === "string" && errorBody.message.trim()) message = errorBody.message;
-    else if (typeof errorBody.error === "string" && errorBody.error.trim()) message = errorBody.error;
+    if (typeof errorBody.message === "string" && errorBody.message.trim()) {
+      message = errorBody.message;
+    } else if (typeof errorBody.error === "string" && errorBody.error.trim()) {
+      message = errorBody.error;
+    }
     if (typeof errorBody.code === "string" || typeof errorBody.code === "number") {
       code = errorBody.code;
     }
@@ -143,11 +154,22 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const startedAt = Date.now();
   const requestId = createRequestId();
   const headers = new Headers(init?.headers);
-  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+
+  // FormData harus membiarkan browser menentukan Content-Type dan boundary.
+  const isFormData =
+    typeof FormData !== "undefined" && init?.body instanceof FormData;
+
+  if (isFormData) {
+    headers.delete("Content-Type");
+  } else if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   // LBK-AUT-04: every state-changing request must carry the CSRF shield header.
   if (method.toUpperCase() !== "GET") {
     headers.set("X-Requested-With", "XMLHttpRequest");
   }
+
   headers.set("X-Request-Id", requestId);
 
   const callerSignal = init?.signal;
@@ -155,9 +177,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   let timedOut = false;
   const timeout = controller
     ? setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, REQUEST_TIMEOUT_MS)
+        timedOut = true;
+        controller.abort();
+      }, REQUEST_TIMEOUT_MS)
     : undefined;
 
   let response: Response;
@@ -187,7 +209,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     const responseRequestId = response.headers.get("X-Request-Id") || requestId;
 
     if (!response.ok) {
-      if (response.status === 401 && path !== "/api/auth/login" && typeof window !== "undefined") {
+      if (
+        response.status === 401 &&
+        path !== "/api/auth/login" &&
+        typeof window !== "undefined"
+      ) {
         window.dispatchEvent(new Event("logbook:unauthorized"));
       }
 
@@ -196,15 +222,17 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
         errorBody = await response.json();
       } catch (error) {
         if (timedOut) throw createTimeoutError(method, path, startedAt, responseRequestId);
-        if (callerSignal != null && error instanceof Error && error.name === "AbortError") throw error;
+        if (callerSignal != null && error instanceof Error && error.name === "AbortError") {
+          throw error;
+        }
         // Use the status-specific message when the error body is not JSON.
       }
 
       const details = readErrorDetails(errorBody);
       if (
-        details.code === "PASSWORD_CHANGE_REQUIRED"
-        && path !== "/api/auth/change-password"
-        && typeof window !== "undefined"
+        details.code === "PASSWORD_CHANGE_REQUIRED" &&
+        path !== "/api/auth/change-password" &&
+        typeof window !== "undefined"
       ) {
         window.dispatchEvent(new Event("logbook:password-change-required"));
       }
@@ -263,7 +291,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       return result;
     } catch (error) {
       if (timedOut) throw createTimeoutError(method, path, startedAt, responseRequestId);
-      if (callerSignal != null && error instanceof Error && error.name === "AbortError") throw error;
+      if (callerSignal != null && error instanceof Error && error.name === "AbortError") {
+        throw error;
+      }
       const apiError = new ApiError(
         response.status,
         "Respons dari server tidak dapat dibaca. Silakan coba lagi.",

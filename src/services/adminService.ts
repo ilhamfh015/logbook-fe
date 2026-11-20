@@ -20,8 +20,29 @@ export type AdminLeave = {
   note: string | null;
 };
 
+export type AdminImportTemporaryPassword = {
+  email: string;
+  password: string;
+};
+
+export type AdminImportResponse = {
+  created: number;
+  updated: number;
+  tempPasswords: AdminImportTemporaryPassword[];
+};
+
 export const adminService = {
   getTalentOptions: () => apiFetch<AdminTalent[]>("/api/admin/users"),
+
+  importUsers: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    return apiFetch<AdminImportResponse>("/api/admin/users/import", {
+      method: "POST",
+      body: formData,
+    });
+  },
 
   getHolidays: () => apiFetch<AdminHoliday[]>("/api/admin/holidays"),
 
