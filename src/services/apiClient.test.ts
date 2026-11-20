@@ -210,6 +210,23 @@ describe("apiFetch interceptor", () => {
     window.removeEventListener("logbook:unauthorized", unauthorized);
   });
 
+  it("dispatches password-change-required when backend asks for it", async () => {
+    const passwordListener = vi.fn();
+    window.addEventListener("logbook:password-change-required", passwordListener);
+    fetchMock.mockResolvedValueOnce(mockResponse(403, {
+      code: "PASSWORD_CHANGE_REQUIRED",
+      message: "Kata sandi harus diganti sebelum melanjutkan",
+    }));
+
+    await expect(apiFetch("/api/settings")).rejects.toMatchObject({
+      status: 403,
+      code: "PASSWORD_CHANGE_REQUIRED",
+    });
+
+    expect(passwordListener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("logbook:password-change-required", passwordListener);
+  });
+
   it("logs 401 for auth/me at debug and login at warn", async () => {
     fetchMock.mockResolvedValueOnce(mockResponse(401)).mockResolvedValueOnce(mockResponse(401));
 

@@ -12,10 +12,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { authService } from "@/services/authService";
 import type { AuthUser } from "@/types/auth";
 
+export const CHANGE_PASSWORD_PATH = "/change-password";
+
+const LOGIN_PATH = "/login";
+const HOME_PATH = "/";
+
 type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
 };
 
@@ -49,23 +55,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!loading && !user && pathname !== "/login") {
-      router.replace("/login");
+    if (loading) return;
+
+    if (!user) {
+      if (pathname !== LOGIN_PATH) router.replace(LOGIN_PATH);
+      return;
+    }
+
+    if (user.mustChangePassword && pathname !== CHANGE_PASSWORD_PATH) {
+      router.replace(CHANGE_PASSWORD_PATH);
+      return;
+    }
+
+    if (!user.mustChangePassword && pathname === CHANGE_PASSWORD_PATH) {
+      router.replace(HOME_PATH);
     }
   }, [loading, user, pathname, router]);
 
   useEffect(() => {
     const handleUnauthorized = () => {
       setUser(null);
-      router.replace("/login");
+      router.replace(LOGIN_PATH);
+    };
+
+    const handlePasswordChangeRequired = () => {
+      setUser((current) => (
+        current && !current.mustChangePassword
+          ? { ...current, mustChangePassword: true }
+          : current
+      ));
+      router.replace(CHANGE_PASSWORD_PATH);
     };
 
     window.addEventListener("logbook:unauthorized", handleUnauthorized);
-    return () => window.removeEventListener("logbook:unauthorized", handleUnauthorized);
+    window.addEventListener("logbook:password-change-required", handlePasswordChangeRequired);
+
+    return () => {
+      window.removeEventListener("logbook:unauthorized", handleUnauthorized);
+      window.removeEventListener("logbook:password-change-required", handlePasswordChangeRequired);
+    };
   }, [router]);
 
   const login = useCallback(async (email: string, password: string) => {
     const current = await authService.login(email, password);
+    setUser(current);
+    return current;
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    const current = await authService.changePassword(currentPassword, newPassword);
     setUser(current);
     return current;
   }, []);
@@ -75,13 +113,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await authService.logout();
     } finally {
       setUser(null);
-      router.replace("/login");
+      router.replace(LOGIN_PATH);
     }
   }, [router]);
 
   const value = useMemo(
-    () => ({ user, loading, login, logout }),
-    [user, loading, login, logout],
+    () => ({ user, loading, login, changePassword, logout }),
+    [user, loading, login, changePassword, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

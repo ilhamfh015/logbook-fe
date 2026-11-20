@@ -40,3 +40,23 @@ describe("authService.login", () => {
     expect(result.roles).toEqual(["TALENT"]);
   });
 });
+
+describe("authService.changePassword", () => {
+  beforeEach(() => {
+    apiFetchMock.mockReset();
+    apiFetchMock.mockResolvedValue(apiUser);
+  });
+
+  it("mengirim kata sandi saat ini dan kata sandi baru ke endpoint ganti kata sandi", async () => {
+    const result = await authService.changePassword("Logbook@2026", "Logbook@2027");
+
+    expect(apiFetchMock).toHaveBeenCalledWith("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({
+        currentPassword: "Logbook@2026",
+        newPassword: "Logbook@2027",
+      }),
+    });
+    expect(result.mustChangePassword).toBe(false);
+  });
+});

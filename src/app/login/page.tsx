@@ -16,7 +16,9 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) router.replace("/");
+    if (!loading && user) {
+      router.replace(user.mustChangePassword ? "/change-password" : "/");
+    }
   }, [loading, user, router]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -38,8 +40,8 @@ export default function LoginPage() {
     setError("");
 
     try {
-      await login(cleanEmail, password);
-      router.replace("/");
+      const current = await login(cleanEmail, password);
+      router.replace(current.mustChangePassword ? "/change-password" : "/");
     } catch (caught) {
       setError(
         caught instanceof ApiError

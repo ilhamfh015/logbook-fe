@@ -38,6 +38,18 @@ export const authService = {
     return mapAuthUser(response);
   },
 
+  changePassword: async (currentPassword: string, newPassword: string): Promise<AuthUser> => {
+    const response = await apiFetch<AuthApiResponseWithRoles>(
+      "/api/auth/change-password",
+      {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      }
+    );
+
+    return mapAuthUser(response);
+  },
+
   me: async (): Promise<AuthUser> => {
     const response = await apiFetch<AuthApiResponseWithRoles>(
       "/api/auth/me"

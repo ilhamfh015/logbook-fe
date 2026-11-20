@@ -197,6 +197,14 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       }
 
       const details = readErrorDetails(errorBody);
+      if (
+        details.code === "PASSWORD_CHANGE_REQUIRED"
+        && path !== "/api/auth/change-password"
+        && typeof window !== "undefined"
+      ) {
+        window.dispatchEvent(new Event("logbook:password-change-required"));
+      }
+
       const kind = "http";
       logFailure(
         method,
