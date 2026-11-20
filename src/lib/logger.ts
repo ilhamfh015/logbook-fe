@@ -59,7 +59,11 @@ function transport(payload: LogPayload) {
   try {
     void fetch(LOG_ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // LBK-AUT-04: shield the internal log endpoint like any other non-GET route.
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
       body: JSON.stringify(payload),
       keepalive: true,
     }).catch(() => {});

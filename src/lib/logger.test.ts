@@ -26,6 +26,16 @@ describe("logger duplicate suppression", () => {
     };
   }
 
+  it("sends the X-Requested-With shield header with log transport", async () => {
+    const logger = await loadLogger();
+
+    logger.info("csrf.header");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const headers = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    expect(headers.get("X-Requested-With")).toBe("XMLHttpRequest");
+  });
+
   it("sends once for a duplicate key and includes its suppressed count next time", async () => {
     const logger = await loadLogger();
 

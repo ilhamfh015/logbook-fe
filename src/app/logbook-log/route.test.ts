@@ -34,10 +34,26 @@ describe("logbook-log route", () => {
   function request(payload: unknown, headers: Record<string, string> = {}) {
     return new Request("https://example.test/logbook-log", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
+      headers: {
+        "Content-Type": "application/json",
+        "x-requested-with": "XMLHttpRequest",
+        ...headers,
+      },
       body: JSON.stringify(payload),
     });
   }
+
+  it("rejects a POST without the X-Requested-With shield header", async () => {
+    const POST = await loadPost();
+    const response = await POST(new Request("https://example.test/logbook-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level: "info", event: "csrf" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect(appendFileMock).not.toHaveBeenCalled();
+  });
 
   it("writes valid redacted payload as one JSON line and normalizes its level", async () => {
     const POST = await loadPost();
@@ -85,6 +101,7 @@ describe("logbook-log route", () => {
     const POST = await loadPost();
     const response = await POST(new Request("https://example.test/logbook-log", {
       method: "POST",
+      headers: { "x-requested-with": "XMLHttpRequest" },
       body: "x".repeat(16 * 1024 + 1),
     }));
 

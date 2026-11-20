@@ -73,6 +73,18 @@ describe("apiFetch interceptor", () => {
     });
   });
 
+  it("adds the CSRF shield header to non-GET requests only", async () => {
+    fetchMock.mockResolvedValue(mockResponse(200, {}));
+
+    await apiFetch("/api/auth/login", { method: "POST" });
+    const postHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    expect(postHeaders.get("X-Requested-With")).toBe("XMLHttpRequest");
+
+    await apiFetch("/api/auth/me");
+    const getHeaders = new Headers(fetchMock.mock.calls[1][1]?.headers);
+    expect(getHeaders.has("X-Requested-With")).toBe(false);
+  });
+
   it("maps backend validation metadata without changing legacy fields", async () => {
     fetchMock.mockResolvedValue(mockResponse(422, {
       code: "VALIDATION_ERROR",

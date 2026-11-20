@@ -144,6 +144,10 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const requestId = createRequestId();
   const headers = new Headers(init?.headers);
   if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  // LBK-AUT-04: every state-changing request must carry the CSRF shield header.
+  if (method.toUpperCase() !== "GET") {
+    headers.set("X-Requested-With", "XMLHttpRequest");
+  }
   headers.set("X-Request-Id", requestId);
 
   const callerSignal = init?.signal;

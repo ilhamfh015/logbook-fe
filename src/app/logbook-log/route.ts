@@ -9,6 +9,8 @@ const LOG_DIR = path.join(process.cwd(), "logs");
 const LOG_FILE = path.join(LOG_DIR, "fe.log");
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_FIELD_LENGTH = 500;
+const CSRF_HEADER = "x-requested-with";
+const CSRF_HEADER_VALUE = "XMLHttpRequest";
 const RATE_WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 60;
 const clientRequests = new Map<string, { windowStartedAt: number; count: number }>();
@@ -21,6 +23,12 @@ function normalizeLevel(value: unknown): LogLevel {
 }
 
 export async function POST(request: Request) {
+  // LBK-AUT-04: this is a non-GET endpoint, so require the CSRF shield header.
+  const requestedWith = request.headers.get(CSRF_HEADER)?.trim();
+  if (!requestedWith || requestedWith.toLowerCase() !== CSRF_HEADER_VALUE.toLowerCase()) {
+    return errorResponse(403, "Permintaan tidak dapat diproses.");
+  }
+
   const origin = request.headers.get("origin");
   if (origin && !isSameHost(origin, request.url)) {
     return errorResponse(403, "Permintaan tidak dapat diproses.");
