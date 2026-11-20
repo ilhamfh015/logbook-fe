@@ -11,6 +11,16 @@ npm run dev
 
 Buka `http://localhost:3000`.
 
+## Akun demo
+
+Fixture dari `logbook.sql` memakai kata sandi `Logbook@2026` untuk akun:
+
+- `rina.talent@contoh.id`
+- `budi.santoso@contoh.id`
+- `sari.wulan@contoh.id`
+
+Kata sandi tersebut hanya untuk lingkungan pengembangan dan harus diganti sebelum dipakai di lingkungan nyata.
+
 ## Unit test
 
 Jalankan unit test dengan Vitest:

@@ -11,6 +11,7 @@ export default function LoginPage() {
   const { user, loading, login } = useAuth();
 
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -28,11 +29,16 @@ export default function LoginPage() {
       return;
     }
 
+    if (!password) {
+      setError("Kata sandi wajib diisi.");
+      return;
+    }
+
     setSubmitting(true);
     setError("");
 
     try {
-      await login(cleanEmail);
+      await login(cleanEmail, password);
       router.replace("/");
     } catch (caught) {
       setError(
@@ -65,7 +71,7 @@ export default function LoginPage() {
           <h1 className="text-xl font-bold tracking-tight">Masuk</h1>
 
           <p className="mt-1 text-sm text-slate-600">
-            Gunakan email yang terdaftar untuk mengakses log book.
+            Gunakan email dan kata sandi yang terdaftar untuk mengakses log book.
           </p>
 
           <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>
@@ -75,12 +81,28 @@ export default function LoginPage() {
               <input
                 type="email"
                 name="email"
-                autoComplete="email"
+                autoComplete="username"
                 autoFocus
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 className="field-control"
                 placeholder="nama@contoh.id"
+                disabled={submitting}
+                required
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold">Kata sandi</span>
+
+              <input
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="field-control"
+                placeholder="Masukkan kata sandi"
                 disabled={submitting}
                 required
               />

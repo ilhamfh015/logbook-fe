@@ -15,7 +15,7 @@ import type { AuthUser } from "@/types/auth";
 type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string) => Promise<AuthUser>;
+  login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
 };
 
@@ -64,8 +64,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("logbook:unauthorized", handleUnauthorized);
   }, [router]);
 
-  const login = useCallback(async (email: string) => {
-    const current = await authService.login(email);
+  const login = useCallback(async (email: string, password: string) => {
+    const current = await authService.login(email, password);
     setUser(current);
     return current;
   }, []);

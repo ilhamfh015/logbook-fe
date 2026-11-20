@@ -26,12 +26,12 @@ function mapAuthUser(data: AuthApiResponseWithRoles): AuthUser {
 }
 
 export const authService = {
-  login: async (email: string): Promise<AuthUser> => {
+  login: async (email: string, password: string): Promise<AuthUser> => {
     const response = await apiFetch<AuthApiResponseWithRoles>(
       "/api/auth/login",
       {
         method: "POST",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, password }),
       }
     );
 
