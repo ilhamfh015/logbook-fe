@@ -220,6 +220,63 @@ describe("TaskShowcase hari aktif server", () => {
   });
 });
 
+describe("TaskShowcase kalender", () => {
+  beforeEach(setupDefaultMocks);
+
+  it("memuat kalender tanggal aktif dan menampilkan label libur nasional", async () => {
+    const today = toDateKey(new Date());
+    mockedSettings.getSettings.mockResolvedValue({
+      workStart: "08:00",
+      workEnd: "17:00",
+      onboarded: true,
+      activeDate: today,
+    });
+    mocked.getDailyLog.mockResolvedValue({ ...draftDailyLog, logDate: today });
+    mocked.getCalendar.mockResolvedValue([
+      {
+        date: today,
+        holidayName: "Hari Kemerdekaan",
+        onLeave: false,
+        weekend: false,
+        workingDay: false,
+      },
+    ]);
+
+    render(<TaskShowcase />);
+
+    expect(
+      await screen.findByText("Libur: Hari Kemerdekaan", {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
+    expect(mocked.getCalendar).toHaveBeenCalledWith(today, today);
+  });
+
+  it("memakai data hari dari Daily Log saat kalender gagal dimuat", async () => {
+    const today = toDateKey(new Date());
+    mockedSettings.getSettings.mockResolvedValue({
+      workStart: "08:00",
+      workEnd: "17:00",
+      onboarded: true,
+      activeDate: today,
+    });
+    mocked.getCalendar.mockRejectedValue(new ApiError(503, "Kalender tidak tersedia."));
+    mocked.getDailyLog.mockResolvedValue({
+      ...draftDailyLog,
+      logDate: today,
+      day: {
+        date: today,
+        holidayName: null,
+        onLeave: true,
+        weekend: false,
+        workingDay: false,
+      },
+    });
+
+    render(<TaskShowcase />);
+
+    expect(await screen.findByText("Cuti", {}, { timeout: 5000 })).toBeInTheDocument();
+  });
+});
+
 function toDateKey(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
