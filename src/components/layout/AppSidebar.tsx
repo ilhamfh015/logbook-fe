@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, CalendarOff, FileText, History, Settings, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarOff, FileText, History, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -8,6 +8,7 @@ type AppSidebarProps = {
   activeItem?:
     | "logbook"
     | "jejak"
+    | "ringkasan"
     | "panduan"
     | "pengaturan"
     | "tim"
@@ -63,6 +64,19 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
                   Jejak
                 </Link>
 
+                <Link
+                  href="/ringkasan"
+                  aria-current={activeItem === "ringkasan" ? "page" : undefined}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
+                    activeItem === "ringkasan"
+                      ? "bg-blue-100 font-semibold text-brand"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <BarChart3 size={19} />
+                  Ringkasanku
+                </Link>
+
                 <div className="my-6 border-t border-slate-200" />
 
                 <p className="px-3 pb-2 text-xs font-semibold text-slate-400">
@@ -113,6 +127,14 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
                 >
                   <History size={19} />
                   Jejak
+                </Link>
+
+                <Link
+                  href="/ringkasan"
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-slate-600 hover:bg-slate-50"
+                >
+                  <BarChart3 size={19} />
+                  Ringkasanku
                 </Link>
 
                 <Link
@@ -191,14 +213,14 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
       </aside>
 
       <nav
-        className={`fixed inset-x-3 bottom-3 z-10 grid ${isAdmin ? "grid-cols-6" : "grid-cols-4"} rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-[11px] font-medium shadow-lg backdrop-blur md:hidden`}
+        className={`fixed inset-x-3 bottom-3 z-10 grid ${isAdmin ? "grid-cols-7" : "grid-cols-5"} rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-[11px] font-medium shadow-lg backdrop-blur md:hidden`}
         aria-label="Navigasi utama"
       >
         {isAtasanPage ? (
           <Link
             href="/atasan/tim"
             aria-current="page"
-            className="col-span-4 flex flex-col items-center gap-1 rounded-xl bg-blue-50 px-1 py-2 text-brand"
+            className="col-span-5 flex flex-col items-center gap-1 rounded-xl bg-blue-50 px-1 py-2 text-brand"
           >
             <Users size={18} />
             Tim
@@ -218,6 +240,16 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
             >
               <History size={18} />
               Jejak
+            </Link>
+            <Link
+              href="/ringkasan"
+              aria-current={activeItem === "ringkasan" ? "page" : undefined}
+              className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${
+                activeItem === "ringkasan" ? "bg-blue-50 text-brand" : "text-slate-600"
+              }`}
+            >
+              <BarChart3 size={18} />
+              Ringkasan
             </Link>
             <Link
               href="/contoh"

@@ -406,6 +406,11 @@ export function TaskForm({
           Peringatan: Waktu task berada di luar jam kerja normal (08.00–17.00). Task tetap bisa disimpan dan akan ditampilkan pada baris jam yang sesuai.
         </p>
       ) : null}
+      {Number.isFinite(durationMinutes) && durationMinutes >= 240 ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status">
+          Peringatan: Durasi task {durationMinutes} menit mencapai atau melebihi batas saran 4 jam (240 menit). Pertimbangkan memecahnya menjadi beberapa task. Task tetap bisa disimpan.
+        </p>
+      ) : null}
       {selectedDuration === "other" ? (
         <label className="block">
           <span className="mb-2 block text-sm font-semibold">Durasi (menit)</span>

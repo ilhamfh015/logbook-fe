@@ -1,13 +1,25 @@
 import type { ReviewDailyLog } from "@/types/review";
+import { getTeamMemberById } from "@/lib/mocks/teamFixtures";
+
+function member(userId: number) {
+  const found = getTeamMemberById(userId);
+  if (!found) throw new Error(`Mock team member ${userId} not found`);
+  return found;
+}
+
+const rina = member(101);
+const sari = member(102);
+const budi = member(103);
+const maya = member(104);
 
 export const reviewFixtures: ReviewDailyLog[] = [
   {
     id: 9001,
-    userId: 101,
-    talentName: "Rina Aulia",
-    talentJenis: "PKL",
-    supervisorName: "Pak Andi",
-    supervisorEmail: "andi@padepokan.id",
+    userId: rina.id,
+    talentName: rina.name,
+    talentJenis: rina.jenis,
+    supervisorName: rina.supervisorName,
+    supervisorEmail: rina.supervisorEmail,
     logDate: "2026-11-09",
     status: "Menunggu",
     submittedAt: "2026-11-09T17:42:00+07:00",
@@ -89,11 +101,11 @@ export const reviewFixtures: ReviewDailyLog[] = [
   },
   {
     id: 9002,
-    userId: 102,
-    talentName: "Sari Wulandari",
-    talentJenis: "Karyawan",
-    supervisorName: "Pak Andi",
-    supervisorEmail: "andi@padepokan.id",
+    userId: sari.id,
+    talentName: sari.name,
+    talentJenis: sari.jenis,
+    supervisorName: sari.supervisorName,
+    supervisorEmail: sari.supervisorEmail,
     logDate: "2026-11-09",
     status: "Perbaikan diajukan",
     submittedAt: "2026-11-09T16:30:00+07:00",
@@ -141,11 +153,11 @@ export const reviewFixtures: ReviewDailyLog[] = [
   },
   {
     id: 9003,
-    userId: 103,
-    talentName: "Budi Santoso",
-    talentJenis: "Magang",
-    supervisorName: "Pak Andi",
-    supervisorEmail: "andi@padepokan.id",
+    userId: budi.id,
+    talentName: budi.name,
+    talentJenis: budi.jenis,
+    supervisorName: budi.supervisorName,
+    supervisorEmail: budi.supervisorEmail,
     logDate: "2026-11-09",
     status: "Menunggu",
     submittedAt: "2026-11-09T17:45:00+07:00",
@@ -182,11 +194,11 @@ export const reviewFixtures: ReviewDailyLog[] = [
   },
   {
     id: 9004,
-    userId: 104,
-    talentName: "Maya Putri",
-    talentJenis: "Magang",
-    supervisorName: "Pak Andi",
-    supervisorEmail: "andi@padepokan.id",
+    userId: maya.id,
+    talentName: maya.name,
+    talentJenis: maya.jenis,
+    supervisorName: maya.supervisorName,
+    supervisorEmail: maya.supervisorEmail,
     logDate: "2026-11-09",
     status: "Ditolak",
     submittedAt: "2026-11-09T16:00:00+07:00",

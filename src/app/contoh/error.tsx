@@ -22,7 +22,7 @@ export default function ExampleError({
       <section className="w-full max-w-lg rounded-xl border border-red-200 bg-white p-6 shadow-sm" role="alert">
         <h1 className="text-xl font-bold">Contoh Log Book tidak dapat ditampilkan</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Terjadi kesalahan saat membuka halaman contoh. Coba muat ulang halaman.
+          Terjadi kesalahan saat membuka halaman contoh. Coba muat ulang. 
         </p>
         {error.digest ? <p className="mt-2 text-xs text-slate-500">Kode galat: {error.digest}</p> : null}
         <div className="mt-5 flex flex-wrap gap-3">
