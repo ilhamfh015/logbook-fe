@@ -244,7 +244,8 @@ export function TeamDashboard() {
                   <td className="px-5 py-4 text-right">
                     <Link
                       href={`/tim/${member.id}/${member.date ?? todayDate}`}
-                      className="inline-flex cursor-not-allowed items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-400"
+                      aria-label={`Buka Daily Log ${member.name}`}
+                      className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-ink hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       Buka <ArrowUpRight size={14} />
                     </Link>

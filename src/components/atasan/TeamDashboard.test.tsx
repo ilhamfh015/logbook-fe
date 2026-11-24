@@ -43,7 +43,7 @@ describe("TeamDashboard", () => {
 
     expect(await screen.findByText("Rina Aulia")).toBeInTheDocument();
     expect(screen.getByText("PKL")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Buka" })).toHaveAttribute("href", "/tim/27/2026-11-17");
+    expect(screen.getByRole("link", { name: "Buka Daily Log Rina Aulia" })).toHaveAttribute("href", "/tim/27/2026-11-17");
     expect(screen.getByRole("link", { name: "Sel, 17 Nov · 7 j" })).toHaveAttribute(
       "href",
       "/tim/27/2026-11-17",
