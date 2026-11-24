@@ -1,2 +1,2 @@
-email,nama,jenis,email_atasan,admin
-indah@contoh.id,Indah,   ,admin1@contoh.id,false
+email,nama,jenis,email_atasan,admin,password
+indah@contoh.id,Indah,   ,admin1@contoh.id,false,Pass@123

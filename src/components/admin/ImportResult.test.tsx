@@ -27,7 +27,7 @@ describe("ImportResult", () => {
     expect(screen.getByText(emails[0])).toBeInTheDocument();
     expect(screen.getByText(emails[1])).toBeInTheDocument();
     expect(
-      screen.getByText(/kata sandi sementara tidak dikirimkan/i),
+      screen.getByText(/kata sandi sementara berasal dari kolom password/i),
     ).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Selesai" }));

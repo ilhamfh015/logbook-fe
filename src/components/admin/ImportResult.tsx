@@ -31,9 +31,9 @@ export function ImportResult({
         <h2 className="text-lg font-semibold">Email pengguna hasil impor</h2>
 
         <p className="mt-3 text-sm text-slate-500">
-          Kata sandi sementara tidak dikirimkan demi keamanan. Beri tahu
-          pengguna untuk memakai alur lupa kata sandi jika belum memiliki kata
-          sandi aktif.
+          Kata sandi sementara berasal dari kolom password pada CSV dan tidak
+          dikirimkan ulang oleh API. Bagikan kata sandi tersebut kepada
+          pengguna; mereka wajib menggantinya saat login pertama.
         </p>
 
         {importedEmails.length > 0 ? (

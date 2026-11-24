@@ -1,3 +1,3 @@
-email,nama,jenis,email_atasan,admin
-fajar.ramadhan@contoh.id,Fajar Ramadhan,PKL,admin1@contoh.id,false
-fajar.ramadhan@contoh.id,Fajar Ramadhan Edit,PKL,admin1@contoh.id,false
+email,nama,jenis,email_atasan,admin,password
+fajar.ramadhan@contoh.id,Fajar Ramadhan,PKL,admin1@contoh.id,false,Pass@123
+fajar.ramadhan@contoh.id,Fajar Ramadhan Edit,PKL,admin1@contoh.id,false,Pass@123
