@@ -20,15 +20,10 @@ export type AdminLeave = {
   note: string | null;
 };
 
-export type AdminImportTemporaryPassword = {
-  email: string;
-  password: string;
-};
-
 export type AdminImportResponse = {
   created: number;
   updated: number;
-  tempPasswords: AdminImportTemporaryPassword[];
+  importedEmails: string[];
 };
 
 export const adminService = {

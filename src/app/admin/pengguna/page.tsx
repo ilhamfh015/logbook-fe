@@ -215,7 +215,7 @@ export default function PenggunaPage() {
               <ImportResult
                 created={importResult.created}
                 updated={importResult.updated}
-                tempPasswords={importResult.tempPasswords}
+                importedEmails={importResult.importedEmails ?? []}
                 onFinish={handleFinish}
               />
             ) : null}
