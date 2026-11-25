@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, CalendarOff, FileText, History, Settings, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarOff, CheckCircle2, FileText, History, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { canAccessTeamPage } from "@/lib/rolePermissions";
@@ -9,24 +9,36 @@ type AppSidebarProps = {
   activeItem?:
     | "logbook"
     | "jejak"
+    | "ringkasan"
     | "panduan"
     | "pengaturan"
     | "tim"
     | "review"
+    | "daily-logs"
     | "libur-cuti"
     | "pengguna";
 };
+
+// Jumlah kolom navigasi mobile -> kelas Tailwind (harus literal agar terdeteksi).
+const MOBILE_GRID_CLASS: Record<number, string> = {
+  5: "grid-cols-5",
+  6: "grid-cols-6",
+  8: "grid-cols-8",
+  9: "grid-cols-9",
+};
+
 export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
   const { user } = useAuth();
   const isAtasanPage = activeItem === "tim";
   const isTeamActive = activeItem === "tim" || activeItem === "review";
   const canAccessTeam = canAccessTeamPage(user?.roles);
   const isAdmin = user?.roles.includes("ADMIN") ?? false;
-  const mobileGridClass = isAtasanPage
-    ? isAdmin ? "grid-cols-6" : "grid-cols-4"
-    : isAdmin
-      ? canAccessTeam ? "grid-cols-7" : "grid-cols-6"
-      : canAccessTeam ? "grid-cols-5" : "grid-cols-4";
+  // Halaman Tim: satu tautan Tim selebar 5 kolom. Halaman lain: 5 item dasar
+  // (Daily Log, Jejak, Ringkasan, Panduan, Pengaturan) + Tim bila berhak.
+  // Admin menambah 3 item (Persetujuan, Libur & Cuti, Pengguna).
+  const mobileColumns =
+    (isAtasanPage ? 5 : 5 + (canAccessTeam ? 1 : 0)) + (isAdmin ? 3 : 0);
+  const mobileGridClass = MOBILE_GRID_CLASS[mobileColumns] ?? "grid-cols-5";
 
   return (
     <>
@@ -68,6 +80,19 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
             >
               <History size={19} />
               Jejak
+            </Link>
+
+            <Link
+              href="/ringkasan"
+              aria-current={activeItem === "ringkasan" ? "page" : undefined}
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
+                activeItem === "ringkasan"
+                  ? "bg-blue-100 font-semibold text-brand"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <BarChart3 size={19} />
+              Ringkasanku
             </Link>
 
             <div className="my-6 border-t border-slate-200" />
@@ -122,6 +147,18 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
                 <div className="my-6 border-t border-slate-200" />
                 <p className="px-3 pb-2 text-xs font-semibold text-slate-400">ADMIN</p>
                 <Link
+                  href="/admin/daily-logs"
+                  aria-current={activeItem === "daily-logs" ? "page" : undefined}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
+                    activeItem === "daily-logs"
+                      ? "bg-blue-100 font-semibold text-brand"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <CheckCircle2 size={19} />
+                  Persetujuan
+                </Link>
+                <Link
                   href="/admin/libur-cuti"
                   aria-current={activeItem === "libur-cuti" ? "page" : undefined}
                   className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
@@ -168,7 +205,7 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
           <Link
             href="/atasan/tim"
             aria-current="page"
-            className="col-span-4 flex flex-col items-center gap-1 rounded-xl bg-blue-50 px-1 py-2 text-brand"
+            className="col-span-5 flex flex-col items-center gap-1 rounded-xl bg-blue-50 px-1 py-2 text-brand"
           >
             <Users size={18} />
             Tim
@@ -188,6 +225,16 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
             >
               <History size={18} />
               Jejak
+            </Link>
+            <Link
+              href="/ringkasan"
+              aria-current={activeItem === "ringkasan" ? "page" : undefined}
+              className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${
+                activeItem === "ringkasan" ? "bg-blue-50 text-brand" : "text-slate-600"
+              }`}
+            >
+              <BarChart3 size={18} />
+              Ringkasan
             </Link>
             <Link
               href="/contoh"
@@ -219,6 +266,16 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
         )}
         {isAdmin ? (
           <>
+            <Link
+              href="/admin/daily-logs"
+              aria-current={activeItem === "daily-logs" ? "page" : undefined}
+              className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${
+                activeItem === "daily-logs" ? "bg-blue-50 text-brand" : "text-slate-600"
+              }`}
+            >
+              <CheckCircle2 size={18} />
+              Persetujuan
+            </Link>
             <Link
               href="/admin/libur-cuti"
               aria-current={activeItem === "libur-cuti" ? "page" : undefined}

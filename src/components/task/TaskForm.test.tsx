@@ -306,4 +306,143 @@ describe("TaskForm", () => {
 
     expect(screen.queryByText("Format tiket tidak valid. Contoh: ABC-154")).not.toBeInTheDocument();
   });
+
+  it("memvalidasi durasi kustom yang kosong dan di luar rentang 5-1440 menit", async () => {
+    const { user, onSave } = renderTaskForm();
+
+    await user.selectOptions(screen.getByRole("combobox"), "other");
+    const customDuration = screen.getByLabelText("Durasi (menit)");
+    expect(customDuration).toHaveValue(30);
+
+    await user.clear(customDuration);
+    await user.click(screen.getByRole("button", { name: "Simpan task" }));
+
+    expect(
+      screen.getByRole("button", { name: "Durasi: Durasi wajib diisi." }),
+    ).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+
+    await user.type(customDuration, "2000");
+    await user.click(screen.getByRole("button", { name: "Simpan task" }));
+
+    expect(
+      screen.getByRole("button", { name: "Durasi: Durasi harus antara 5 dan 1440 menit." }),
+    ).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("menyimpan durasi kustom yang valid", async () => {
+    const onSave = vi.fn(async () => undefined);
+    const { user } = renderTaskForm(onSave);
+
+    await user.click(screen.getByRole("button", { name: "Alpha" }));
+    await user.click(screen.getByRole("button", { name: "Development" }));
+    await user.selectOptions(screen.getByRole("combobox"), "other");
+    const customDuration = screen.getByLabelText("Durasi (menit)");
+    await user.clear(customDuration);
+    await user.type(customDuration, "45");
+    await user.type(
+      screen.getByRole("textbox", { name: /Ringkasan dan hasil/ }),
+      "Menyelesaikan fitur",
+    );
+    await user.click(screen.getByRole("button", { name: "Simpan task" }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ durationMinutes: 45 }),
+    );
+  });
+
+  it("mewajibkan jam mulai diisi", async () => {
+    const { user, onSave } = renderTaskForm();
+
+    fireEvent.change(screen.getByLabelText(/Mulai/), { target: { value: "" } });
+    await user.click(screen.getByRole("button", { name: "Simpan task" }));
+
+    expect(
+      screen.getByRole("button", { name: "Mulai: Jam mulai wajib diisi." }),
+    ).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("merapikan spasi tiket, ringkasan, dan kendala sebelum disimpan", async () => {
+    const onSave = vi.fn(async () => undefined);
+    const { user } = renderTaskForm(onSave);
+
+    await user.click(screen.getByRole("button", { name: "Alpha" }));
+    await user.click(screen.getByRole("button", { name: "Development" }));
+    await user.selectOptions(screen.getByRole("combobox"), "30");
+    await user.type(screen.getByRole("textbox", { name: /Tiket/ }), "  ABC-142  ");
+    await user.type(
+      screen.getByRole("textbox", { name: /Ringkasan dan hasil/ }),
+      "  Menyelesaikan fitur  ",
+    );
+    await user.type(screen.getByLabelText(/Kendala/), "  butuh akses staging  ");
+    await user.click(screen.getByRole("button", { name: "Simpan task" }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ticket: "ABC-142",
+        summary: "Menyelesaikan fitur",
+        obstacle: "butuh akses staging",
+      }),
+    );
+  });
+
+  it("menonaktifkan form saat blocked", () => {
+    renderTaskForm(vi.fn(async () => undefined), { blocked: true });
+
+    expect(screen.getByRole("button", { name: "Simpan task" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Alpha" })).toBeDisabled();
+    expect(screen.getByLabelText(/Kendala/)).toBeDisabled();
+  });
+
+  it("menampilkan galat server umum lalu menyembunyikannya setelah field diubah", async () => {
+    const { user } = renderTaskForm(vi.fn(async () => undefined), {
+      formError: "Server sedang sibuk.",
+    });
+
+    expect(screen.getByText("Server sedang sibuk.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Alpha" }));
+
+    expect(screen.queryByText("Server sedang sibuk.")).not.toBeInTheDocument();
+  });
+
+  it("memilih durasi kustom saat durasi task lama tidak ada di daftar pilihan", () => {
+    renderTaskForm(undefined, {
+      initialTask: {
+        id: "7",
+        projectId: 1,
+        taskTypeId: 2,
+        workStatusId: 3,
+        project: "Alpha",
+        projectColor: "blue",
+        ticket: "ABC-142",
+        startTime: "08:00",
+        durationMinutes: 45,
+        type: "Development",
+        summary: "Melanjutkan pekerjaan.",
+        obstacle: "",
+        workStatus: "BERJALAN",
+      },
+    });
+
+    expect(screen.getByRole("combobox")).toHaveValue("other");
+    expect(screen.getByLabelText("Durasi (menit)")).toHaveValue(45);
+  });
+
+  it("memakai initialStartTime saat menambah task baru", () => {
+    renderTaskForm(undefined, { initialStartTime: "09:30" });
+
+    expect(screen.getByLabelText(/Mulai/)).toHaveValue("09:30");
+  });
+
+  it("memberi tahu field yang berubah melalui onFieldChange", async () => {
+    const onFieldChange = vi.fn();
+    const { user } = renderTaskForm(undefined, { onFieldChange });
+
+    await user.click(screen.getByRole("button", { name: "Development" }));
+
+    expect(onFieldChange).toHaveBeenCalledWith("type");
+  });
 });

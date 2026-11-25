@@ -1,2 +1,2 @@
-email,nama,jenis,email_atasan,admin
-citra.dewi@contoh.id,Citra Dewi,PKL,tidak.ada@contoh.id,false
+email,nama,jenis,email_atasan,admin,password
+citra.dewi@contoh.id,Citra Dewi,PKL,tidak.ada@contoh.id,false,Pass@123

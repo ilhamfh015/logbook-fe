@@ -1,4 +1,5 @@
 import { apiFetch } from "@/services/apiClient";
+import type { AdminDailyLogDto, DailyLogDecisionResponse } from "@/types/reviewApi";
 
 export type AdminHoliday = {
   id: number;
@@ -20,16 +21,20 @@ export type AdminLeave = {
   note: string | null;
 };
 
-export type AdminImportTemporaryPassword = {
-  email: string;
-  password: string;
-};
-
 export type AdminImportResponse = {
   created: number;
   updated: number;
-  tempPasswords: AdminImportTemporaryPassword[];
+  importedEmails: string[];
 };
+
+export type AdminDailyLogFilters = {
+  date?: string | null;
+  userId?: number | string | null;
+  status?: string | null;
+};
+
+/** Aksi keputusan Daily Log yang boleh dilakukan Admin. */
+export type AdminDailyLogDecision = "approve" | "reject" | "approve-revision";
 
 export const adminService = {
   getTalentOptions: () => apiFetch<AdminTalent[]>("/api/admin/users"),
@@ -43,6 +48,37 @@ export const adminService = {
       body: formData,
     });
   },
+
+  getAdminDailyLogs: (filters: AdminDailyLogFilters = {}) => {
+    const params = new URLSearchParams();
+    const { date, userId, status } = filters;
+
+    if (date) params.set("date", date);
+    if (typeof userId === "number" && Number.isFinite(userId)) {
+      params.set("userId", String(userId));
+    } else if (typeof userId === "string" && userId.trim()) {
+      params.set("userId", userId.trim());
+    }
+    if (status) params.set("status", status);
+
+    const query = params.toString();
+    return apiFetch<AdminDailyLogDto[]>(
+      `/api/admin/daily-logs${query ? `?${query}` : ""}`,
+    );
+  },
+
+  decideDailyLog: (
+    dailyLogId: number,
+    decision: AdminDailyLogDecision,
+    reason?: string,
+  ) =>
+    apiFetch<DailyLogDecisionResponse>(
+      `/api/daily-logs/${dailyLogId}/${decision}`,
+      {
+        method: "POST",
+        ...(reason === undefined ? {} : { body: JSON.stringify({ reason }) }),
+      },
+    ),
 
   getHolidays: () => apiFetch<AdminHoliday[]>("/api/admin/holidays"),
 

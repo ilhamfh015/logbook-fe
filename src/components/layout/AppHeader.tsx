@@ -20,6 +20,7 @@ export function AppHeader() {
   const isAtasanPage = pathname.startsWith("/atasan");
   const isAdminPage = pathname.startsWith("/admin");
   const isSettingsPage = pathname.startsWith("/pengaturan");
+  const isRingkasanPage = pathname.startsWith("/ringkasan");
 
   const roleLabel = user?.roles.includes("ATASAN")
     ? "Atasan"
@@ -82,11 +83,13 @@ export function AppHeader() {
         <span className="font-medium text-ink">
           {isSettingsPage
             ? "Pengaturan"
-            : isAtasanPage
-              ? "Tim"
-              : isAdminPage
-                ? "Libur & Cuti"
-                : "Log Book"}
+            : isRingkasanPage
+              ? "Ringkasanku"
+              : isAtasanPage
+                ? "Tim"
+                : isAdminPage
+                  ? "Libur & Cuti"
+                  : "Log Book"}
         </span>
       </div>
 

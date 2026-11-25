@@ -171,11 +171,14 @@ export default function PenggunaPage() {
                   </p>
 
                   <code className="mt-2 break-all rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                    email,nama,jenis,email_atasan,admin
+                    email,nama,jenis,email_atasan,admin,password
                   </code>
 
                   <p className="mt-2 text-xs text-slate-500">
-                    Impor ulang memperbarui pengguna berdasarkan email.
+                    Kolom password wajib minimal 6 karakter. Impor ulang
+                    memperbarui data dan password pengguna yang masih memakai
+                    password sementara; password yang sudah diganti tidak
+                    ditimpa.
                   </p>
                 </div>
               </div>
@@ -215,7 +218,7 @@ export default function PenggunaPage() {
               <ImportResult
                 created={importResult.created}
                 updated={importResult.updated}
-                tempPasswords={importResult.tempPasswords}
+                importedEmails={importResult.importedEmails ?? []}
                 onFinish={handleFinish}
               />
             ) : null}

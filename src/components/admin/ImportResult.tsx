@@ -1,18 +1,16 @@
 "use client";
 
-import type { AdminImportTemporaryPassword } from "@/services/adminService";
-
 type ImportResultProps = {
   created: number;
   updated: number;
-  tempPasswords: AdminImportTemporaryPassword[];
+  importedEmails?: string[];
   onFinish: () => void;
 };
 
 export function ImportResult({
   created,
   updated,
-  tempPasswords,
+  importedEmails = [],
   onFinish,
 }: ImportResultProps) {
   return (
@@ -30,42 +28,28 @@ export function ImportResult({
       </div>
 
       <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold">Kata sandi sementara</h2>
+        <h2 className="text-lg font-semibold">Email pengguna hasil impor</h2>
 
         <p className="mt-3 text-sm text-slate-500">
-          Kata sandi hanya ditampilkan selama hasil impor ini terbuka. Klik
-          Selesai untuk menghapusnya dari halaman. Talent wajib menggantinya
-          saat login pertama.
+          Kata sandi sementara berasal dari kolom password pada CSV dan tidak
+          dikirimkan ulang oleh API. Bagikan kata sandi tersebut kepada
+          pengguna; mereka wajib menggantinya saat login pertama.
         </p>
 
-        {tempPasswords.length > 0 ? (
-          <div className="mt-5 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b bg-slate-50">
-                <tr>
-                  <th className="p-3">Email</th>
-                  <th className="p-3">Kata sandi sementara</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {tempPasswords.map((item, index) => (
-                  <tr
-                    key={`${item.email}-${index}`}
-                    className="border-b last:border-0"
-                  >
-                    <td className="p-3">{item.email}</td>
-                    <td className="p-3 font-mono font-semibold">
-                      {item.password}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {importedEmails.length > 0 ? (
+          <ul className="mt-4 space-y-2" role="list">
+            {importedEmails.map((email, index) => (
+              <li
+                key={`${email}-${index}`}
+                className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700"
+              >
+                {email}
+              </li>
+            ))}
+          </ul>
         ) : (
           <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
-            Tidak ada kata sandi sementara yang perlu ditampilkan.
+            Tidak ada email pengguna baru yang perlu ditampilkan.
           </p>
         )}
       </div>
