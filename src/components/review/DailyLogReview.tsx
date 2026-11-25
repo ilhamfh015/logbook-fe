@@ -114,7 +114,7 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
     <div className="flex min-h-[calc(100vh-64px)] min-w-0 flex-1 flex-col lg:flex-row">
       <main className="min-w-0 flex-1">
         <div className="px-4 pt-5 sm:px-5 lg:px-7">
-          <Link href="/tim" className="text-sm font-medium text-blue-700 underline underline-offset-2">
+          <Link href="/atasan/tim" className="text-sm font-medium text-blue-700 underline underline-offset-2">
             ‹ Kembali ke Tim
           </Link>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
