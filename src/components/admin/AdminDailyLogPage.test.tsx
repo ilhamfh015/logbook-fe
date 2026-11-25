@@ -7,6 +7,7 @@ import { adminService } from "@/services/adminService";
 import type {
   AdminDailyLogDto,
   DailyLogDecisionResponse,
+  DayDto,
 } from "@/types/reviewApi";
 
 vi.mock("@/components/auth/AuthProvider", () => ({
@@ -20,6 +21,7 @@ vi.mock("@/services/adminService", () => ({
   adminService: {
     getTalentOptions: vi.fn(),
     getAdminDailyLogs: vi.fn(),
+    getTalentDailyLog: vi.fn(),
     decideDailyLog: vi.fn(),
   },
 }));
@@ -65,6 +67,37 @@ const revisionLog: AdminDailyLogDto = {
   revisionReason: "Tambah task rapat",
 };
 
+const talentDay: DayDto = {
+  date: "2026-11-25",
+  status: "MENUNGGU",
+  statusLabel: "Menunggu",
+  totalMinutes: 90,
+  tasks: [
+    {
+      id: 1,
+      project: "Magang",
+      color: "blue",
+      ticket: "LB-1",
+      startMinute: 480,
+      durationMinutes: 40,
+      type: "Rapat",
+      summary: "Rapat mingguan",
+      workStatus: "Selesai",
+    },
+    {
+      id: 2,
+      project: "Magang",
+      color: "blue",
+      ticket: "LB-2",
+      startMinute: 540,
+      durationMinutes: 50,
+      type: "Implementasi",
+      summary: "Mengerjakan fitur persetujuan",
+      workStatus: "Berjalan",
+    },
+  ],
+};
+
 const decisionResponse: DailyLogDecisionResponse = {
   id: 1,
   userId: 10,
@@ -91,6 +124,7 @@ describe("AdminDailyLogPage", () => {
       approvedLog,
       revisionLog,
     ]);
+    vi.mocked(adminService.getTalentDailyLog).mockResolvedValue(talentDay);
     vi.mocked(adminService.decideDailyLog).mockResolvedValue(decisionResponse);
   });
 
@@ -231,5 +265,52 @@ describe("AdminDailyLogPage", () => {
     expect(
       within(alert).getByRole("button", { name: "Coba lagi" }),
     ).toBeInTheDocument();
+  });
+
+  it("menampilkan detail Daily Log talent secara hanya baca", async () => {
+    const user = userEvent.setup();
+    render(<AdminDailyLogPage />);
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: /Lihat Daily Log Rina Talent/,
+      }),
+    );
+
+    const panel = await screen.findByRole("dialog", {
+      name: /Detail Daily Log Rina Talent/,
+    });
+    expect(adminService.getTalentDailyLog).toHaveBeenCalledWith(
+      10,
+      "2026-11-25",
+    );
+    expect(within(panel).getByText("Hanya baca")).toBeInTheDocument();
+    expect(await within(panel).findByText("Rapat mingguan")).toBeInTheDocument();
+    expect(
+      within(panel).getByText("Mengerjakan fitur persetujuan"),
+    ).toBeInTheDocument();
+
+    await user.click(within(panel).getByRole("button", { name: "Tutup detail" }));
+    expect(
+      screen.queryByRole("dialog", { name: /Detail Daily Log Rina Talent/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("menampilkan pesan API saat detail Daily Log gagal dimuat", async () => {
+    vi.mocked(adminService.getTalentDailyLog).mockRejectedValue(
+      new ApiError(403, "Anda tidak memiliki akses."),
+    );
+    const user = userEvent.setup();
+    render(<AdminDailyLogPage />);
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: /Lihat Daily Log Rina Talent/,
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Anda tidak memiliki akses.",
+    );
   });
 });

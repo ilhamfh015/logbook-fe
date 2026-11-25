@@ -1,5 +1,9 @@
 import { apiFetch } from "@/services/apiClient";
-import type { AdminDailyLogDto, DailyLogDecisionResponse } from "@/types/reviewApi";
+import type {
+  AdminDailyLogDto,
+  DailyLogDecisionResponse,
+  DayDto,
+} from "@/types/reviewApi";
 
 export type AdminHoliday = {
   id: number;
@@ -66,6 +70,11 @@ export const adminService = {
       `/api/admin/daily-logs${query ? `?${query}` : ""}`,
     );
   },
+
+  getTalentDailyLog: (userId: number | string, date: string) =>
+    apiFetch<DayDto>(
+      `/api/daily-logs/users/${userId}?date=${encodeURIComponent(date)}`,
+    ),
 
   decideDailyLog: (
     dailyLogId: number,

@@ -4,11 +4,13 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
 } from "react";
-import { CheckCircle2, LoaderCircle, RotateCcw, Search } from "lucide-react";
+import { CheckCircle2, Eye, LoaderCircle, RotateCcw, Search } from "lucide-react";
+import { AdminDailyLogDetail } from "@/components/admin/AdminDailyLogDetail";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Dialog } from "@/components/shared/Dialog";
 import { statusFromCode } from "@/lib/reviewMapper";
@@ -23,7 +25,7 @@ import {
   type AdminDailyLogFilters,
   type AdminTalent,
 } from "@/services/adminService";
-import type { AdminDailyLogDto } from "@/types/reviewApi";
+import type { AdminDailyLogDto, DayDto } from "@/types/reviewApi";
 
 type FilterForm = {
   date: string;
@@ -36,6 +38,18 @@ type DecisionTarget = {
   talentName: string;
   logDate: string;
   action: AdminDailyLogDecision;
+};
+
+type DetailTarget = {
+  userId: number;
+  fullName: string;
+  dateIso: string;
+  dateLabel: string;
+  statusCode: string;
+  statusLabel: string;
+  submittedAt: string | null;
+  rejectionReason: string | null;
+  revisionReason: string | null;
 };
 
 const EMPTY_FILTERS: FilterForm = { date: "", userId: "", status: "" };
@@ -72,6 +86,7 @@ const DECISION_NOTICES: Record<AdminDailyLogDecision, string> = {
 const LOAD_ERROR =
   "Daftar Daily Log belum dapat dimuat. Periksa koneksi lalu coba lagi.";
 const DECISION_ERROR = "Keputusan gagal disimpan. Silakan coba lagi.";
+const DETAIL_ERROR = "Detail Daily Log belum dapat dimuat. Silakan coba lagi.";
 
 const fieldClass =
   "field-control min-h-10 disabled:cursor-not-allowed disabled:bg-slate-50";
@@ -91,6 +106,11 @@ export function AdminDailyLogPage() {
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<DetailTarget | null>(null);
+  const [detail, setDetail] = useState<DayDto | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const detailRequestRef = useRef(0);
 
   const fetchData = useCallback(async (nextFilters: AdminDailyLogFilters) => {
     try {
@@ -202,6 +222,47 @@ export function AdminDailyLogPage() {
       setPageError(getErrorMessage(error, DECISION_ERROR));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const closeDetail = () => {
+    detailRequestRef.current += 1;
+    setDetailTarget(null);
+    setDetail(null);
+    setDetailError("");
+    setDetailLoading(false);
+  };
+
+  const openDetail = async (log: AdminDailyLogDto) => {
+    if (typeof log.userId !== "number" || !log.logDate) return;
+
+    const dateIso = log.logDate.slice(0, 10);
+    const requestId = detailRequestRef.current + 1;
+    detailRequestRef.current = requestId;
+    setDetailTarget({
+      userId: log.userId,
+      fullName: log.fullName || "Talent",
+      dateIso,
+      dateLabel: formatDate(dateIso),
+      statusCode: log.status ?? "",
+      statusLabel: statusLabel(log.status),
+      submittedAt: log.submittedAt ?? null,
+      rejectionReason: log.rejectionReason ?? null,
+      revisionReason: log.revisionReason ?? null,
+    });
+    setDetail(null);
+    setDetailError("");
+    setDetailLoading(true);
+
+    try {
+      const day = await adminService.getTalentDailyLog(log.userId, dateIso);
+      if (detailRequestRef.current === requestId) setDetail(day);
+    } catch (error) {
+      if (detailRequestRef.current === requestId) {
+        setDetailError(getErrorMessage(error, DETAIL_ERROR));
+      }
+    } finally {
+      if (detailRequestRef.current === requestId) setDetailLoading(false);
     }
   };
 
@@ -396,6 +457,14 @@ export function AdminDailyLogPage() {
                     <td className="px-5 py-3.5 text-slate-600">{log.taskCount ?? 0}</td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void openDetail(log)}
+                          aria-label={`Lihat Daily Log ${actionLabel}`}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                        >
+                          <Eye size={14} /> Lihat
+                        </button>
                         {status === "MENUNGGU" ? (
                           <>
                             <button
@@ -510,6 +579,22 @@ export function AdminDailyLogPage() {
           </div>
         ) : null}
       </Dialog>
+
+      <AdminDailyLogDetail
+        open={detailTarget !== null}
+        fullName={detailTarget?.fullName ?? ""}
+        dateIso={detailTarget?.dateIso ?? ""}
+        dateLabel={detailTarget?.dateLabel ?? ""}
+        statusCode={detailTarget?.statusCode ?? ""}
+        statusLabel={detailTarget?.statusLabel ?? ""}
+        submittedAt={detailTarget?.submittedAt ?? null}
+        rejectionReason={detailTarget?.rejectionReason ?? null}
+        revisionReason={detailTarget?.revisionReason ?? null}
+        day={detail}
+        loading={detailLoading}
+        errorMessage={detailError}
+        onClose={closeDetail}
+      />
     </main>
   );
 }
