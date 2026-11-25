@@ -13,7 +13,10 @@ export type DailyLogStatusCode =
 
 /** DTO GET /api/team/{userId}/days/{date} dan GET /api/daily-logs/users/{userId}?date=. */
 export type DayDto = {
+  dailyLogId?: number | null;
   date?: string | null;
+  fullName?: string | null;
+  jenis?: string | null;
   status?: string | null;
   statusLabel?: string | null;
   editable?: boolean | null;
@@ -24,6 +27,12 @@ export type DayDto = {
   perProject?: Array<{ name?: string | null; color?: string | null; minutes?: number | null } | null> | null;
   tasks?: Array<DayTaskDto | null> | null;
   rejectReason?: string | null;
+  submittedAt?: string | null;
+  autoSubmitted?: boolean | null;
+  revisionReason?: string | null;
+  decidedAt?: string | null;
+  decidedByName?: string | null;
+  decidedBy?: string | null;
 };
 
 /** Elemen tasks pada DTO GET /api/team/{userId}/days/{date}. */

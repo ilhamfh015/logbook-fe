@@ -13,21 +13,21 @@ export type ReviewStatus =
 
 // tasks sudah dalam bentuk TaskDraft (nama proyek, warna, jenis sudah ter-resolve) supaya langsung bisa dipakai linimasa. Pemetaan dari ApiTask ke TaskDraft dikerjakan saat integrasi API (jadwal baris 52).
 export interface ReviewDailyLog {
-  id: DailyLog["id"];
+  id: DailyLog["id"] | null;
   userId: AuthUser["id"];
-  talentName: string;
-  talentJenis: string;
-  supervisorName: string;
-  supervisorEmail: string;
+  talentName: string | null;
+  talentJenis: string | null;
+  supervisorName: string | null;
+  supervisorEmail: string | null;
   logDate: string;
-  status: ReviewStatus;
+  status: ReviewStatus | null;
   submittedAt: string | null;
-  autoSubmitted: boolean;
+  autoSubmitted: boolean | null;
   rejectionReason: string | null;
   revisionReason: string | null;
   decidedByName: string | null;
   decidedAt: string | null;
-  totalDurationMinutes: number;
+  totalDurationMinutes: number | null;
   tasks: TaskDraft[];
 }
 
