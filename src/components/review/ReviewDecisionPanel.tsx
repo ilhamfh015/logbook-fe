@@ -259,8 +259,8 @@ export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps
         onCancel={cancelConfirmation}
       >
         {dialogAction === "approveCorrection"
-          ? `Setujui perbaikan Daily Log ${log.talentName} untuk ${formattedDate}?`
-          : `Setujui Daily Log ${log.talentName} untuk ${formattedDate}?`}
+          ? `Setujui perbaikan Daily Log ${log.talentName ?? "Pengguna"} untuk ${formattedDate}?`
+          : `Setujui Daily Log ${log.talentName ?? "Pengguna"} untuk ${formattedDate}?`}
       </Dialog>
     </section>
   );

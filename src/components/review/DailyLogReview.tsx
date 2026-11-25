@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { TimelinePreview, formatDuration } from "@/components/preview/TimelinePreview";
 import { ReviewDecisionPanel } from "@/components/review/ReviewDecisionPanel";
 import { ApiError } from "@/services/apiClient";
@@ -24,37 +25,48 @@ const statusClassNames: Record<ReviewStatus, string> = {
 };
 
 export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
+  const { user } = useAuth();
+  const isAdmin = user?.admin === true;
   const [retryCount, setRetryCount] = useState(0);
   const [requestResult, setRequestResult] = useState<{
     key: string;
     log: ReviewDailyLog | null;
     errorMessage: string;
-  }>({ key: "", log: null, errorMessage: "" });
+    emptyMessage: string;
+  }>({ key: "", log: null, errorMessage: "", emptyMessage: "" });
   const [override, setOverride] = useState<{ key: string; log: ReviewDailyLog } | null>(null);
   const requestKey = `${userId}:${dateIso}:${retryCount}`;
 
   useEffect(() => {
     let active = true;
 
-    getTalentDailyLog(userId, dateIso)
+    getTalentDailyLog(userId, dateIso, isAdmin)
       .then((result) => {
-        if (active) setRequestResult({ key: requestKey, log: result, errorMessage: "" });
+        if (active) {
+          setRequestResult({ key: requestKey, log: result, errorMessage: "", emptyMessage: "" });
+        }
       })
       .catch((error: unknown) => {
         if (!active) return;
+        const notFound = error instanceof ApiError && error.status === 404;
         const message = error instanceof ApiError
           ? error.message
           : error instanceof Error
             ? error.message
             : "Daily Log belum dapat dimuat.";
-        setRequestResult({ key: requestKey, log: null, errorMessage: message });
+        setRequestResult({
+          key: requestKey,
+          log: null,
+          errorMessage: notFound ? "" : message,
+          emptyMessage: notFound ? "Belum ada Daily Log untuk tanggal ini." : "",
+        });
       })
       .catch(() => undefined);
 
     return () => {
       active = false;
     };
-  }, [dateIso, requestKey, userId]);
+  }, [dateIso, isAdmin, requestKey, userId]);
 
   const loading = requestResult.key !== requestKey;
   const log = loading
@@ -63,11 +75,20 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
       ? override.log
       : requestResult.log;
   const errorMessage = loading ? "" : requestResult.errorMessage;
+  const emptyMessage = loading ? "" : requestResult.emptyMessage;
 
   if (loading) {
     return (
       <div className="flex min-h-[calc(100vh-64px)] min-w-0 flex-1 items-start p-6 text-sm text-slate-600" role="status">
         Memuat Daily Log...
+      </div>
+    );
+  }
+
+  if (emptyMessage) {
+    return (
+      <div className="flex min-h-[calc(100vh-64px)] min-w-0 flex-1 items-start p-6 text-sm text-slate-600" role="status">
+        {emptyMessage}
       </div>
     );
   }
@@ -90,6 +111,9 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
   }
 
   const logDate = new Date(`${log.logDate}T12:00:00+07:00`);
+  const talentName = log.talentName ?? "Pengguna";
+  const talentJenis = log.talentJenis ?? "—";
+  const supervisorName = log.supervisorName ?? "—";
   const formattedDate = new Intl.DateTimeFormat("id-ID", {
     timeZone: "Asia/Jakarta",
     weekday: "long",
@@ -120,7 +144,7 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-bold text-ink sm:text-2xl">
-                {log.talentName} · {formattedDate}
+                {talentName} · {formattedDate}
               </h1>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                 Hanya baca
@@ -157,21 +181,21 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
       <aside className="w-full shrink-0 border-t border-slate-200 bg-white p-5 lg:w-[340px] lg:basis-[340px] lg:border-l lg:border-t-0">
         <h2 className="text-lg font-bold text-ink">Informasi Daily Log</h2>
         <dl className="mt-4 space-y-3 text-sm">
-          <InfoRow label="Talent" value={`${log.talentName} · ${log.talentJenis}`} />
-          <InfoRow label="Atasan" value={log.supervisorName} />
+          <InfoRow label="Talent" value={`${talentName} · ${talentJenis}`} />
+          <InfoRow label="Atasan" value={supervisorName} />
           <InfoRow label="Tanggal log" value={formattedDate} />
           <InfoRow label="Dikirim" value={submittedLabel} />
           <div className="flex items-center justify-between gap-3">
             <dt className="text-slate-500">Status</dt>
             <dd>
-              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClassNames[log.status]}`}>
-                {log.status}
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${log.status ? statusClassNames[log.status] : "bg-slate-100 text-slate-700"}`}>
+                {log.status ?? "—"}
               </span>
             </dd>
           </div>
           <InfoRow
             label="Total jam · task"
-            value={`${formatDuration(log.totalDurationMinutes)} · ${log.tasks.length} task`}
+            value={`${log.totalDurationMinutes === null ? "—" : formatDuration(log.totalDurationMinutes)} · ${log.tasks.length} task`}
           />
         </dl>
 

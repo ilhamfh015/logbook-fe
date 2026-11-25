@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { DailyLogReview } from "@/components/review/DailyLogReview";
+import { ApiError } from "@/services/apiClient";
 import { getTalentDailyLog } from "@/services/reviewService";
 import type { ReviewDailyLog } from "@/types/review";
 
 vi.mock("@/services/reviewService", () => ({
   getTalentDailyLog: vi.fn(),
+}));
+
+vi.mock("@/components/auth/AuthProvider", () => ({
+  useAuth: () => ({ user: { admin: false } }),
 }));
 
 vi.mock("@/components/preview/TimelinePreview", () => ({
@@ -49,5 +54,17 @@ describe("DailyLogReview", () => {
       "href",
       "/atasan/tim",
     );
+  });
+
+  it("menampilkan empty state netral saat BE tidak menemukan Daily Log", async () => {
+    vi.mocked(getTalentDailyLog).mockRejectedValue(
+      new ApiError(404, "Belum ada Daily Log untuk tanggal ini."),
+    );
+
+    render(<DailyLogReview userId="2" dateIso="2026-11-17" />);
+
+    expect(await screen.findByText("Belum ada Daily Log untuk tanggal ini.")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Coba lagi" })).not.toBeInTheDocument();
   });
 });
