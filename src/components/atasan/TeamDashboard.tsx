@@ -33,7 +33,12 @@ function dateKeyFromDate(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-export function TeamDashboard() {
+export function TeamDashboard({
+  audience = "atasan",
+}: {
+  audience?: "atasan" | "admin";
+} = {}) {
+  const isAdminAudience = audience === "admin";
   const [retryCount, setRetryCount] = useState(0);
   const [requestResult, setRequestResult] = useState<{
     key: number;
@@ -45,7 +50,7 @@ export function TeamDashboard() {
   useEffect(() => {
     let active = true;
 
-    getTeam()
+    getTeam(isAdminAudience ? "ADMIN" : "ATASAN")
       .then((result) => {
         if (active) {
           setRequestResult({
@@ -65,7 +70,7 @@ export function TeamDashboard() {
     return () => {
       active = false;
     };
-  }, [requestKey]);
+  }, [isAdminAudience, requestKey]);
 
   const loading = requestResult.key !== requestKey;
   const members = loading ? [] : requestResult.members;
@@ -73,6 +78,7 @@ export function TeamDashboard() {
   const hasError = errorItems.length > 0;
   const summaryReady = !loading && !hasError;
   const todayDate = members.find((member) => member.date)?.date ?? dateKeyFromDate(new Date());
+  const reviewBasePath = isAdminAudience ? "/admin/tim" : "/tim";
   const pendingDays = members.reduce((total, member) => total + member.pendingDays, 0);
   const revisionCount = members.filter((member) => member.status === "Perbaikan diajukan").length;
   const leaveCount = members.filter((member) => member.status === "Cuti" || member.status === "Libur").length;
@@ -86,7 +92,9 @@ export function TeamDashboard() {
             <h1 className="text-2xl font-bold tracking-tight text-ink">Tim</h1>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Anggota tim yang menjadikan Anda atasan langsung
+            {isAdminAudience
+              ? "Seluruh talent yang tercatat dalam Log Book"
+              : "Anggota tim yang menjadikan Anda atasan langsung"}
           </p>
         </div>
 
@@ -120,9 +128,9 @@ export function TeamDashboard() {
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
-          title="Anggota tim"
+          title={isAdminAudience ? "Total talent" : "Anggota tim"}
           value={summaryReady ? String(members.length) : "—"}
-          description="Bawahan langsung"
+          description={isAdminAudience ? "Seluruh talent aktif" : "Bawahan langsung"}
           icon={<Users size={20} />}
         />
         <SummaryCard
@@ -147,9 +155,13 @@ export function TeamDashboard() {
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="font-bold text-ink">Ringkasan anggota tim</h2>
+          <h2 className="font-bold text-ink">
+            {isAdminAudience ? "Ringkasan seluruh talent" : "Ringkasan anggota tim"}
+          </h2>
           <p className="mt-1 text-xs text-slate-500">
-            Status aktivitas anggota hari ini
+            {isAdminAudience
+              ? "Status aktivitas seluruh talent hari ini"
+              : "Status aktivitas anggota hari ini"}
           </p>
         </div>
 
@@ -192,7 +204,9 @@ export function TeamDashboard() {
               ) : members.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-5 py-8 text-center text-sm text-slate-500">
-                    Belum ada anggota tim.
+                    {isAdminAudience
+                      ? "Belum ada talent."
+                      : "Belum ada anggota tim."}
                   </td>
                 </tr>
               ) : members.map((member) => (
@@ -225,7 +239,7 @@ export function TeamDashboard() {
                         {member.pending.map((item) => item.date ? (
                           <Link
                             key={`${member.id}-${item.date}`}
-                            href={`/tim/${member.id}/${item.date}`}
+                            href={`${reviewBasePath}/${member.id}/${item.date}`}
                             className="block text-xs text-slate-600"
                           >
                             {item.text}
@@ -243,7 +257,7 @@ export function TeamDashboard() {
 
                   <td className="px-5 py-4 text-right">
                     <Link
-                      href={`/tim/${member.id}/${member.date ?? todayDate}`}
+                      href={`${reviewBasePath}/${member.id}/${member.date ?? todayDate}`}
                       aria-label={`Buka Daily Log ${member.name}`}
                       className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-ink hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >
@@ -258,8 +272,9 @@ export function TeamDashboard() {
 
         <div className="border-t border-slate-100 px-5 py-3">
           <p className="text-xs text-slate-500">
-            Klik hari menunggu untuk membuka Daily Log hanya baca. Jam = total
-            harian, aktivitas paralel dihitung sekali.
+            Klik Buka atau hari menunggu untuk melihat Daily Log. Tombol
+            Setujui dan Tolak ada di halaman tersebut. Jam = total harian,
+            aktivitas paralel dihitung sekali.
           </p>
           <p className="mt-1 text-xs text-amber-700">
             Menampilkan status hari ini. Daftar lengkap hari menunggu keputusan akan ditampilkan setelah tersedia dari server.

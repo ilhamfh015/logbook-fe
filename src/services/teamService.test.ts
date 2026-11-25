@@ -13,12 +13,19 @@ describe("getTeam", () => {
     mockedApiFetch.mockReset();
   });
 
-  it("requests /api/team through apiFetch", async () => {
+  it("requests atasan scope by default", async () => {
     const response = [{ userId: 3, fullName: "Rina Aulia" }];
     mockedApiFetch.mockResolvedValue(response);
 
     await expect(getTeam()).resolves.toEqual(response);
-    expect(mockedApiFetch).toHaveBeenCalledWith("/api/team");
+    expect(mockedApiFetch).toHaveBeenCalledWith("/api/team?scope=ATASAN");
+  });
+
+  it("requests admin scope when asked", async () => {
+    mockedApiFetch.mockResolvedValue([]);
+
+    await expect(getTeam("ADMIN")).resolves.toEqual([]);
+    expect(mockedApiFetch).toHaveBeenCalledWith("/api/team?scope=ADMIN");
   });
 
   it("returns an empty list for a non-array response", async () => {

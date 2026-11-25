@@ -3,10 +3,14 @@
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { canAccessReviewPage, canAccessTeamPage } from "@/lib/rolePermissions";
+import {
+  canAccessAdminPage,
+  canAccessReviewPage,
+  canAccessTeamPage,
+} from "@/lib/rolePermissions";
 
 type RolePageGuardProps = {
-  access: "team" | "review";
+  access: "team" | "review" | "admin";
   children: ReactNode;
 };
 
@@ -15,7 +19,9 @@ export function RolePageGuard({ access, children }: RolePageGuardProps) {
   const { user, loading } = useAuth();
   const allowed = access === "team"
     ? canAccessTeamPage(user?.roles)
-    : canAccessReviewPage(user?.roles);
+    : access === "admin"
+      ? canAccessAdminPage(user?.roles)
+      : canAccessReviewPage(user?.roles);
 
   useEffect(() => {
     if (!loading && user && !allowed) router.replace("/");

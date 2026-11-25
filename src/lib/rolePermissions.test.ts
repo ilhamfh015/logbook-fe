@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { canAccessReviewPage, canAccessTeamPage } from "@/lib/rolePermissions";
+import {
+  canAccessAdminPage,
+  canAccessReviewPage,
+  canAccessTeamPage,
+} from "@/lib/rolePermissions";
 
 describe("rolePermissions", () => {
   it.each([
@@ -28,11 +32,24 @@ describe("rolePermissions", () => {
     expect(canAccessReviewPage(roles)).toBe(expected);
   });
 
+  it.each([
+    [[], false],
+    [["TALENT"], false],
+    [["ATASAN"], false],
+    [["ADMIN"], true],
+    [["TALENT", "ADMIN"], true],
+    [["ATASAN", "ADMIN"], true],
+  ])("menentukan akses halaman admin untuk roles %j", (roles, expected) => {
+    expect(canAccessAdminPage(roles)).toBe(expected);
+  });
+
   it("menerima variasi huruf dan menangani roles kosong", () => {
     expect(canAccessTeamPage(["atasan"])).toBe(true);
     expect(canAccessReviewPage(["admin"])).toBe(true);
+    expect(canAccessAdminPage(["admin"])).toBe(true);
     expect(canAccessTeamPage(null)).toBe(false);
     expect(canAccessTeamPage(undefined)).toBe(false);
     expect(canAccessReviewPage([])).toBe(false);
+    expect(canAccessAdminPage(null)).toBe(false);
   });
 });

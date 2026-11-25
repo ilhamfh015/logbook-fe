@@ -12,6 +12,7 @@ import type { ReviewDailyLog, ReviewStatus } from "@/types/review";
 type DailyLogReviewProps = {
   userId: string;
   dateIso: string;
+  backHref?: string;
 };
 
 const statusClassNames: Record<ReviewStatus, string> = {
@@ -24,7 +25,11 @@ const statusClassNames: Record<ReviewStatus, string> = {
   Terlewat: "border border-dashed border-slate-400 bg-white text-slate-700",
 };
 
-export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
+export function DailyLogReview({
+  userId,
+  dateIso,
+  backHref = "/atasan/tim",
+}: DailyLogReviewProps) {
   const { user } = useAuth();
   const isAdmin = user?.admin === true;
   const [retryCount, setRetryCount] = useState(0);
@@ -138,7 +143,7 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
     <div className="flex min-h-[calc(100vh-64px)] min-w-0 flex-1 flex-col lg:flex-row">
       <main className="min-w-0 flex-1">
         <div className="px-4 pt-5 sm:px-5 lg:px-7">
-          <Link href="/atasan/tim" className="text-sm font-medium text-blue-700 underline underline-offset-2">
+          <Link href={backHref} className="text-sm font-medium text-blue-700 underline underline-offset-2">
             ‹ Kembali ke Tim
           </Link>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">

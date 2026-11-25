@@ -63,6 +63,21 @@ describe("DailyLogReview", () => {
     );
   });
 
+  it("memakai tautan kembali yang diberikan untuk halaman admin", async () => {
+    render(
+      <DailyLogReview
+        userId="2"
+        dateIso="2026-11-17"
+        backHref="/admin/tim"
+      />,
+    );
+
+    expect(await screen.findByRole("link", { name: "‹ Kembali ke Tim" })).toHaveAttribute(
+      "href",
+      "/admin/tim",
+    );
+  });
+
   it("menampilkan empty state netral saat BE tidak menemukan Daily Log", async () => {
     vi.mocked(getTalentDailyLog).mockRejectedValue(
       new ApiError(404, "Belum ada Daily Log untuk tanggal ini."),

@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, BookOpen, CalendarOff, CheckCircle2, FileText, History, Settings, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarOff, FileText, History, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { canAccessTeamPage } from "@/lib/rolePermissions";
@@ -14,7 +14,7 @@ type AppSidebarProps = {
     | "pengaturan"
     | "tim"
     | "review"
-    | "daily-logs"
+    | "admin-tim"
     | "libur-cuti"
     | "pengguna";
 };
@@ -35,7 +35,7 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
   const isAdmin = user?.roles.includes("ADMIN") ?? false;
   // Halaman Tim: satu tautan Tim selebar 5 kolom. Halaman lain: 5 item dasar
   // (Daily Log, Jejak, Ringkasan, Panduan, Pengaturan) + Tim bila berhak.
-  // Admin menambah 3 item (Persetujuan, Libur & Cuti, Pengguna).
+  // Admin menambah 3 item (Tim, Libur & Cuti, Pengguna).
   const mobileColumns =
     (isAtasanPage ? 5 : 5 + (canAccessTeam ? 1 : 0)) + (isAdmin ? 3 : 0);
   const mobileGridClass = MOBILE_GRID_CLASS[mobileColumns] ?? "grid-cols-5";
@@ -147,16 +147,16 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
                 <div className="my-6 border-t border-slate-200" />
                 <p className="px-3 pb-2 text-xs font-semibold text-slate-400">ADMIN</p>
                 <Link
-                  href="/admin/daily-logs"
-                  aria-current={activeItem === "daily-logs" ? "page" : undefined}
+                  href="/admin/tim"
+                  aria-current={activeItem === "admin-tim" ? "page" : undefined}
                   className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
-                    activeItem === "daily-logs"
+                    activeItem === "admin-tim"
                       ? "bg-blue-100 font-semibold text-brand"
                       : "text-slate-600 hover:bg-slate-50"
                   }`}
                 >
-                  <CheckCircle2 size={19} />
-                  Persetujuan
+                  <Users size={19} />
+                  Tim
                 </Link>
                 <Link
                   href="/admin/libur-cuti"
@@ -267,14 +267,14 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
         {isAdmin ? (
           <>
             <Link
-              href="/admin/daily-logs"
-              aria-current={activeItem === "daily-logs" ? "page" : undefined}
+              href="/admin/tim"
+              aria-current={activeItem === "admin-tim" ? "page" : undefined}
               className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${
-                activeItem === "daily-logs" ? "bg-blue-50 text-brand" : "text-slate-600"
+                activeItem === "admin-tim" ? "bg-blue-50 text-brand" : "text-slate-600"
               }`}
             >
-              <CheckCircle2 size={18} />
-              Persetujuan
+              <Users size={18} />
+              Tim
             </Link>
             <Link
               href="/admin/libur-cuti"

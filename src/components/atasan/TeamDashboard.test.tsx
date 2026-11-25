@@ -90,4 +90,30 @@ describe("TeamDashboard", () => {
     expect(leaveCard).not.toBeNull();
     expect(within(leaveCard!).getByText("-")).toBeInTheDocument();
   });
+
+  it("memakai label seluruh talent untuk tampilan admin", async () => {
+    mockedGetTeam.mockResolvedValue(teamResponse);
+
+    render(<TeamDashboard audience="admin" />);
+
+    expect(await screen.findByText("Rina Aulia")).toBeInTheDocument();
+    expect(
+      screen.getByText("Seluruh talent yang tercatat dalam Log Book"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Total talent")).toBeInTheDocument();
+    expect(screen.getByText("Ringkasan seluruh talent")).toBeInTheDocument();
+    expect(mockedGetTeam).toHaveBeenCalledWith("ADMIN");
+    expect(
+      screen.getByRole("link", { name: "Buka Daily Log Rina Aulia" }),
+    ).toHaveAttribute("href", "/admin/tim/27/2026-11-17");
+  });
+
+  it("meminta cakupan atasan secara default", async () => {
+    mockedGetTeam.mockResolvedValue(teamResponse);
+
+    render(<TeamDashboard />);
+
+    await screen.findByText("Rina Aulia");
+    expect(mockedGetTeam).toHaveBeenCalledWith("ATASAN");
+  });
 });

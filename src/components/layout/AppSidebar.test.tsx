@@ -102,9 +102,15 @@ describe("AppSidebar menu Tim", () => {
       "ATASAN",
       "ADMIN",
     ]);
-    expect(sidebar.getByRole("link", { name: "Tim" })).toHaveAttribute(
-      "aria-current",
-      "page",
+    const timLinks = sidebar.getAllByRole("link", { name: "Tim" });
+    const atasanTim = timLinks.find(
+      (link) => link.getAttribute("href") === "/atasan/tim",
     );
+    const adminTim = timLinks.find(
+      (link) => link.getAttribute("href") === "/admin/tim",
+    );
+
+    expect(atasanTim).toHaveAttribute("aria-current", "page");
+    expect(adminTim).not.toHaveAttribute("aria-current", "page");
   });
 });
