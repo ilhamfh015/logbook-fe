@@ -25,6 +25,11 @@ export function Dialog({
 }: DialogProps) {
   const titleId = useId();
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const onCancelRef = useRef(onCancel);
+
+  useEffect(() => {
+    onCancelRef.current = onCancel;
+  }, [onCancel]);
 
   useEffect(() => {
     if (!open) return;
@@ -36,7 +41,7 @@ export function Dialog({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onCancel();
+        onCancelRef.current();
       }
     };
 
@@ -46,7 +51,7 @@ export function Dialog({
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, onCancel]);
+  }, [open]);
 
   if (!open) return null;
 

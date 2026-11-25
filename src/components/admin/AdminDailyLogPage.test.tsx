@@ -170,9 +170,17 @@ describe("AdminDailyLogPage", () => {
     ).toBeInTheDocument();
     expect(adminService.decideDailyLog).not.toHaveBeenCalled();
 
-    fireEvent.change(within(dialog).getByLabelText(/Alasan penolakan/), {
-      target: { value: "Ringkasan kurang rinci" },
-    });
+    await user.type(
+      within(dialog).getByLabelText(/Alasan penolakan/),
+      "Ringkasan kurang rinci",
+    );
+
+    // Mengetik alasan tidak boleh mengirim keputusan sebelum tombol ditekan.
+    expect(adminService.decideDailyLog).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole("textbox")).toHaveValue(
+      "Ringkasan kurang rinci",
+    );
+
     await user.click(within(dialog).getByRole("button", { name: "Tolak" }));
 
     await waitFor(() => {
