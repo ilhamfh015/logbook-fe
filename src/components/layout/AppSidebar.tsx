@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, BookOpen, CalendarOff, FileText, History, Settings, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarOff, CheckCircle2, FileText, History, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -12,6 +12,7 @@ type AppSidebarProps = {
     | "panduan"
     | "pengaturan"
     | "tim"
+    | "daily-logs"
     | "libur-cuti"
     | "pengguna";
 };
@@ -174,6 +175,18 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
                 <div className="my-6 border-t border-slate-200" />
                 <p className="px-3 pb-2 text-xs font-semibold text-slate-400">ADMIN</p>
                 <Link
+                  href="/admin/daily-logs"
+                  aria-current={activeItem === "daily-logs" ? "page" : undefined}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
+                    activeItem === "daily-logs"
+                      ? "bg-blue-100 font-semibold text-brand"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <CheckCircle2 size={19} />
+                  Persetujuan
+                </Link>
+                <Link
                   href="/admin/libur-cuti"
                   aria-current={activeItem === "libur-cuti" ? "page" : undefined}
                   className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
@@ -213,7 +226,7 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
       </aside>
 
       <nav
-        className={`fixed inset-x-3 bottom-3 z-10 grid ${isAdmin ? "grid-cols-7" : "grid-cols-5"} rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-[11px] font-medium shadow-lg backdrop-blur md:hidden`}
+        className={`fixed inset-x-3 bottom-3 z-10 grid ${isAdmin ? "grid-cols-8" : "grid-cols-5"} rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-[11px] font-medium shadow-lg backdrop-blur md:hidden`}
         aria-label="Navigasi utama"
       >
         {isAtasanPage ? (
@@ -269,6 +282,16 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
         )}
         {isAdmin ? (
           <>
+            <Link
+              href="/admin/daily-logs"
+              aria-current={activeItem === "daily-logs" ? "page" : undefined}
+              className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${
+                activeItem === "daily-logs" ? "bg-blue-50 text-brand" : "text-slate-600"
+              }`}
+            >
+              <CheckCircle2 size={18} />
+              Persetujuan
+            </Link>
             <Link
               href="/admin/libur-cuti"
               aria-current={activeItem === "libur-cuti" ? "page" : undefined}
