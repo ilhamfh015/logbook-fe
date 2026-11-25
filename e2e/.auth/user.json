@@ -1,0 +1,15 @@
+{
+  "cookies": [
+    {
+      "name": "LOGBOOK_SESSION",
+      "value": "E3AA25AEBF96B68DE110562B060FD9F2",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}
