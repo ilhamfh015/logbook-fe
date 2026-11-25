@@ -41,6 +41,16 @@ describe("adminService Daily Log", () => {
     expect(mockedApiFetch).toHaveBeenCalledWith("/api/admin/daily-logs");
   });
 
+  it("mengambil detail Daily Log talent berdasarkan user dan tanggal", async () => {
+    mockedApiFetch.mockResolvedValue(undefined);
+
+    await adminService.getTalentDailyLog(10, "2026-11-25");
+
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      "/api/daily-logs/users/10?date=2026-11-25",
+    );
+  });
+
   it("mengirim POST approve tanpa body", async () => {
     mockedApiFetch.mockResolvedValue(undefined);
 
