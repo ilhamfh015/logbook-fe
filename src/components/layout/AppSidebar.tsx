@@ -3,6 +3,7 @@
 import { BarChart3, BookOpen, CalendarOff, CheckCircle2, FileText, History, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { canAccessTeamPage } from "@/lib/rolePermissions";
 
 type AppSidebarProps = {
   activeItem?:
@@ -12,14 +13,32 @@ type AppSidebarProps = {
     | "panduan"
     | "pengaturan"
     | "tim"
+    | "review"
     | "daily-logs"
     | "libur-cuti"
     | "pengguna";
 };
+
+// Jumlah kolom navigasi mobile -> kelas Tailwind (harus literal agar terdeteksi).
+const MOBILE_GRID_CLASS: Record<number, string> = {
+  5: "grid-cols-5",
+  6: "grid-cols-6",
+  8: "grid-cols-8",
+  9: "grid-cols-9",
+};
+
 export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
   const { user } = useAuth();
   const isAtasanPage = activeItem === "tim";
+  const isTeamActive = activeItem === "tim" || activeItem === "review";
+  const canAccessTeam = canAccessTeamPage(user?.roles);
   const isAdmin = user?.roles.includes("ADMIN") ?? false;
+  // Halaman Tim: satu tautan Tim selebar 5 kolom. Halaman lain: 5 item dasar
+  // (Daily Log, Jejak, Ringkasan, Panduan, Pengaturan) + Tim bila berhak.
+  // Admin menambah 3 item (Persetujuan, Libur & Cuti, Pengguna).
+  const mobileColumns =
+    (isAtasanPage ? 5 : 5 + (canAccessTeam ? 1 : 0)) + (isAdmin ? 3 : 0);
+  const mobileGridClass = MOBILE_GRID_CLASS[mobileColumns] ?? "grid-cols-5";
 
   return (
     <>
@@ -33,143 +52,96 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
           </p>
 
           <nav className="mt-8 flex-1 space-y-1 text-sm">
-            {!isAtasanPage ? (
+            <p className="px-3 pb-2 text-xs font-semibold text-slate-400">
+              LOG BOOK SAYA
+            </p>
+
+            <Link
+              href="/"
+              aria-current={activeItem === "logbook" ? "page" : undefined}
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
+                activeItem === "logbook"
+                  ? "bg-blue-100 font-semibold text-brand"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <FileText size={19} />
+              Daily Log
+            </Link>
+
+            <Link
+              href="/jejak"
+              aria-current={activeItem === "jejak" ? "page" : undefined}
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
+                activeItem === "jejak"
+                  ? "bg-blue-100 font-semibold text-brand"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <History size={19} />
+              Jejak
+            </Link>
+
+            <Link
+              href="/ringkasan"
+              aria-current={activeItem === "ringkasan" ? "page" : undefined}
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
+                activeItem === "ringkasan"
+                  ? "bg-blue-100 font-semibold text-brand"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <BarChart3 size={19} />
+              Ringkasanku
+            </Link>
+
+            <div className="my-6 border-t border-slate-200" />
+
+            <p className="px-3 pb-2 text-xs font-semibold text-slate-400">
+              Lainnya
+            </p>
+
+            <Link
+              href="/contoh"
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-slate-600 hover:bg-slate-50"
+            >
+              <BookOpen size={19} />
+              Contoh Log Book
+            </Link>
+
+            <Link
+              href="/pengaturan"
+              aria-current={activeItem === "pengaturan" ? "page" : undefined}
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
+                activeItem === "pengaturan"
+                  ? "bg-blue-100 font-semibold text-brand"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Settings size={19} />
+              Pengaturan
+            </Link>
+
+            {canAccessTeam ? (
               <>
-                <p className="px-3 pb-2 text-xs font-semibold text-slate-400">
-                  LOG BOOK SAYA
-                </p>
-
-                <Link
-                  href="/"
-                  aria-current={activeItem === "logbook" ? "page" : undefined}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
-                    activeItem === "logbook"
-                      ? "bg-blue-100 font-semibold text-brand"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <FileText size={19} />
-                  Daily Log
-                </Link>
-
-                <Link
-                  href="/jejak"
-                  aria-current={activeItem === "jejak" ? "page" : undefined}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
-                    activeItem === "jejak"
-                      ? "bg-blue-100 font-semibold text-brand"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <History size={19} />
-                  Jejak
-                </Link>
-
-                <Link
-                  href="/ringkasan"
-                  aria-current={activeItem === "ringkasan" ? "page" : undefined}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
-                    activeItem === "ringkasan"
-                      ? "bg-blue-100 font-semibold text-brand"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <BarChart3 size={19} />
-                  Ringkasanku
-                </Link>
-
                 <div className="my-6 border-t border-slate-200" />
-
-                <p className="px-3 pb-2 text-xs font-semibold text-slate-400">
-                  Lainnya
-                </p>
-
-                <Link
-                  href="/contoh"
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-slate-600 hover:bg-slate-50"
-                >
-                  <BookOpen size={19} />
-                  Contoh Log Book
-                </Link>
-
-                <Link
-                  href="/pengaturan"
-                  aria-current={
-                    activeItem === "pengaturan" ? "page" : undefined
-                  }
-                  className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
-                    activeItem === "pengaturan"
-                      ? "bg-blue-100 font-semibold text-brand"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <Settings size={19} />
-                  Pengaturan
-                </Link>
-
-              </>
-            ) : (
-              <>
-                <p className="px-3 pb-2 text-xs font-semibold text-slate-400">
-                  LOG BOOK SAYA
-                </p>
-
-                <Link
-                  href="/"
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-slate-600 hover:bg-slate-50"
-                >
-                  <FileText size={19} />
-                  Daily Log
-                </Link>
-
-                <Link
-                  href="/jejak"
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-slate-600 hover:bg-slate-50"
-                >
-                  <History size={19} />
-                  Jejak
-                </Link>
-
-                <Link
-                  href="/ringkasan"
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-slate-600 hover:bg-slate-50"
-                >
-                  <BarChart3 size={19} />
-                  Ringkasanku
-                </Link>
-
-                <Link
-                  href="/contoh"
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-slate-600 hover:bg-slate-50"
-                >
-                  <BookOpen size={19} />
-                  Contoh Log Book
-                </Link>
-
-                <Link
-                  href="/pengaturan"
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-slate-600 hover:bg-slate-50"
-                >
-                  <Settings size={19} />
-                  Pengaturan
-                </Link>
-
-                <div className="my-6 border-t border-slate-200" />
-
                 <p className="px-3 pb-2 text-xs font-semibold text-slate-400">
                   ATASAN
                 </p>
-
                 <Link
                   href="/atasan/tim"
-                  aria-current="page"
-                  className="flex items-center gap-3 rounded-xl bg-blue-100 px-3 py-3 font-semibold text-brand"
+                  aria-current={isTeamActive ? "page" : undefined}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 ${
+                    isTeamActive
+                      ? "bg-blue-100 font-semibold text-brand"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
                 >
                   <Users size={19} />
                   Tim
                 </Link>
               </>
-            )}
+            ) : null}
             {isAdmin ? (
               <>
                 <div className="my-6 border-t border-slate-200" />
@@ -226,7 +198,7 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
       </aside>
 
       <nav
-        className={`fixed inset-x-3 bottom-3 z-10 grid ${isAdmin ? "grid-cols-8" : "grid-cols-5"} rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-[11px] font-medium shadow-lg backdrop-blur md:hidden`}
+        className={`fixed inset-x-3 bottom-3 z-10 grid ${mobileGridClass} rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-[11px] font-medium shadow-lg backdrop-blur md:hidden`}
         aria-label="Navigasi utama"
       >
         {isAtasanPage ? (
@@ -278,6 +250,18 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
               <Settings size={18} />
               Pengaturan
             </Link>
+            {canAccessTeam ? (
+              <Link
+                href="/atasan/tim"
+                aria-current={isTeamActive ? "page" : undefined}
+                className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 ${
+                  isTeamActive ? "bg-blue-50 text-brand" : "text-slate-600"
+                }`}
+              >
+                <Users size={18} />
+                Tim
+              </Link>
+            ) : null}
           </>
         )}
         {isAdmin ? (
