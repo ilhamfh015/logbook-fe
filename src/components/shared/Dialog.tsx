@@ -11,6 +11,7 @@ type DialogProps = {
   onConfirm: () => void;
   onCancel: () => void;
   tone?: "default" | "danger";
+  disabled?: boolean;
 };
 
 export function Dialog({
@@ -22,6 +23,7 @@ export function Dialog({
   onConfirm,
   onCancel,
   tone = "default",
+  disabled = false,
 }: DialogProps) {
   const titleId = useId();
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -61,6 +63,7 @@ export function Dialog({
         type="button"
         tabIndex={-1}
         aria-label="Tutup dialog"
+        disabled={disabled}
         onClick={onCancel}
         className="absolute inset-0 cursor-default bg-slate-900/50 backdrop-blur-[2px]"
       />
@@ -76,6 +79,7 @@ export function Dialog({
           {cancelLabel ? (
             <button
               type="button"
+              disabled={disabled}
               onClick={onCancel}
               className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
@@ -85,6 +89,7 @@ export function Dialog({
           <button
             ref={confirmRef}
             type="button"
+            disabled={disabled}
             onClick={onConfirm}
             className={`rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
               tone === "danger"

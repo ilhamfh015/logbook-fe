@@ -16,18 +16,20 @@ import type { ReviewDailyLog } from "@/types/review";
 type ReviewDecisionPanelProps = {
   log: ReviewDailyLog;
   onUpdated: (log: ReviewDailyLog) => void;
+  onReload: () => void;
 };
 
 type DecisionAction = "approve" | "approveCorrection";
 type PendingAction = DecisionAction | "reject";
 
-export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps) {
+export function ReviewDecisionPanel({ log, onUpdated, onReload }: ReviewDecisionPanelProps) {
   const { user } = useAuth();
   const { canApprove, canReject, canApproveCorrection, reason } = getReviewActions(log, user);
   const [formOpen, setFormOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [validationMessage, setValidationMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [fieldErrorMessages, setFieldErrorMessages] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState("");
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [dialogAction, setDialogAction] = useState<DecisionAction | null>(null);
@@ -61,6 +63,7 @@ export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps
       ? approveButtonRef.current
       : correctionButtonRef.current;
     setErrorMessage("");
+    setFieldErrorMessages([]);
     setDialogAction(action);
   };
 
@@ -69,6 +72,7 @@ export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps
     requestInProgress.current = true;
     setPendingAction(action);
     setErrorMessage("");
+    setFieldErrorMessages([]);
     setSuccessMessage("");
 
     try {
@@ -81,6 +85,7 @@ export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps
       setFormOpen(false);
       setRejectionReason("");
       setValidationMessage("");
+      setDialogAction(null);
       setSuccessMessage(
         action === "approve"
           ? "Daily Log disetujui."
@@ -90,13 +95,18 @@ export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps
       );
       window.setTimeout(() => panelRef.current?.focus(), 0);
     } catch (error: unknown) {
-      setErrorMessage(
-        error instanceof ApiError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : "Keputusan belum dapat disimpan.",
-      );
+      if (error instanceof ApiError && error.status === 400) {
+        setErrorMessage(error.message || "Permintaan tidak valid.");
+        setFieldErrorMessages(Object.values(error.fieldErrors));
+      } else if (error instanceof ApiError && error.status === 403) {
+        setErrorMessage("Anda tidak berhak memutuskan Daily Log ini.");
+      } else if (error instanceof ApiError && error.status === 409) {
+        setErrorMessage("Status Daily Log sudah berubah. Data dimuat ulang.");
+        setDialogAction(null);
+        onReload();
+      } else {
+        setErrorMessage("Keputusan belum dapat disimpan. Silakan coba lagi.");
+      }
     } finally {
       requestInProgress.current = false;
       setPendingAction(null);
@@ -106,12 +116,11 @@ export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps
   const confirmDecision = () => {
     if (!dialogAction || requestInProgress.current) return;
     const action = dialogAction;
-    setDialogAction(null);
-    restoreDialogFocus();
     void runDecision(action);
   };
 
   const cancelConfirmation = () => {
+    if (requestInProgress.current) return;
     setDialogAction(null);
     restoreDialogFocus();
   };
@@ -126,10 +135,11 @@ export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps
     }
 
     setValidationMessage("");
-    void runDecision("reject", rejectionReason);
+    void runDecision("reject", rejectionReason.trim());
   };
 
   const cancelRejection = () => {
+    if (requestInProgress.current) return;
     setFormOpen(false);
     setRejectionReason("");
     setValidationMessage("");
@@ -139,6 +149,16 @@ export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps
 
   const disabled = pendingAction !== null;
   const noActionAvailable = !canApprove && !canReject && !canApproveCorrection;
+  const errorContent = errorMessage ? (
+    <>
+      <p>{errorMessage}</p>
+      {fieldErrorMessages.length ? (
+        <ul className="mt-1 list-disc pl-5">
+          {fieldErrorMessages.map((message, index) => <li key={`${index}-${message}`}>{message}</li>)}
+        </ul>
+      ) : null}
+    </>
+  ) : null;
 
   return (
     <section
@@ -203,8 +223,16 @@ export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps
                 </p>
               ) : null}
               <p className="mt-1 text-right text-xs text-slate-500">
-                {rejectionReason.length} / {REJECTION_REASON_MAX}
+                {rejectionReason.trim().length} / {REJECTION_REASON_MAX}
               </p>
+              {errorMessage ? (
+                <p role="alert" className="mt-2 text-sm leading-5 text-slate-800">
+                  {errorMessage}
+                  {fieldErrorMessages.length ? (
+                    <span className="block">{fieldErrorMessages.join(" ")}</span>
+                  ) : null}
+                </p>
+              ) : null}
               <div className="mt-3 flex justify-end gap-2">
                 <button
                   type="button"
@@ -239,9 +267,9 @@ export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps
         </button>
       ) : null}
 
-      {errorMessage ? (
+      {errorMessage && !dialogAction && !(formOpen && canReject) ? (
         <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-5 text-slate-800">
-          {errorMessage}
+          {errorContent}
         </p>
       ) : null}
       {successMessage ? (
@@ -257,10 +285,20 @@ export function ReviewDecisionPanel({ log, onUpdated }: ReviewDecisionPanelProps
         cancelLabel="Batal"
         onConfirm={confirmDecision}
         onCancel={cancelConfirmation}
+        disabled={disabled}
       >
-        {dialogAction === "approveCorrection"
-          ? `Setujui perbaikan Daily Log ${log.talentName ?? "Pengguna"} untuk ${formattedDate}?`
-          : `Setujui Daily Log ${log.talentName ?? "Pengguna"} untuk ${formattedDate}?`}
+        <>
+          <p>
+            {dialogAction === "approveCorrection"
+              ? `Setujui perbaikan Daily Log ${log.talentName ?? "Pengguna"} untuk ${formattedDate}?`
+              : `Setujui Daily Log ${log.talentName ?? "Pengguna"} untuk ${formattedDate}?`}
+          </p>
+          {errorMessage ? (
+            <p role="alert" className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-slate-800">
+              {errorContent}
+            </p>
+          ) : null}
+        </>
       </Dialog>
     </section>
   );

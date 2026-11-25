@@ -1,4 +1,5 @@
 import type { AuthUser } from "@/types/auth";
+import { canAccessReviewPage } from "@/lib/rolePermissions";
 import type { ReviewDailyLog } from "@/types/review";
 
 type ReviewActions = {
@@ -24,12 +25,16 @@ export function getReviewActions(
     return noActions("Masuk untuk memutuskan Daily Log.");
   }
 
-  if (log.userId === user.id) {
-    return noActions("Kamu tidak dapat memutuskan Daily Log milikmu sendiri.");
+  if (!canAccessReviewPage(user.roles)) {
+    return noActions("Hanya atasan atau admin yang dapat memutuskan Daily Log.");
   }
 
-  if (user.admin !== true && user.email !== log.supervisorEmail) {
-    return noActions("Hanya atasan langsung atau admin yang dapat memutuskan Daily Log ini.");
+  if ((log.status === "Menunggu" || log.status === "Perbaikan diajukan") && log.id == null) {
+    return noActions("Keputusan untuk tanggal ini belum dapat dilakukan dari halaman ini.");
+  }
+
+  if (Number.isFinite(user.id) && Number.isFinite(log.userId) && log.userId === user.id) {
+    return noActions("Anda tidak dapat memutuskan Daily Log milik sendiri.");
   }
 
   if (log.status === "Menunggu") {

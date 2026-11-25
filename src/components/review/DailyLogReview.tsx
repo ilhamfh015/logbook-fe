@@ -35,7 +35,7 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
     emptyMessage: string;
   }>({ key: "", log: null, errorMessage: "", emptyMessage: "" });
   const [override, setOverride] = useState<{ key: string; log: ReviewDailyLog } | null>(null);
-  const requestKey = `${userId}:${dateIso}:${retryCount}`;
+  const requestKey = `${userId}:${dateIso}`;
 
   useEffect(() => {
     let active = true;
@@ -66,7 +66,7 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
     return () => {
       active = false;
     };
-  }, [dateIso, isAdmin, requestKey, userId]);
+  }, [dateIso, isAdmin, requestKey, retryCount, userId]);
 
   const loading = requestResult.key !== requestKey;
   const log = loading
@@ -220,6 +220,10 @@ export function DailyLogReview({ userId, dateIso }: DailyLogReviewProps) {
         <ReviewDecisionPanel
           log={log}
           onUpdated={(updatedLog) => setOverride({ key: requestKey, log: updatedLog })}
+          onReload={() => {
+            setOverride(null);
+            setRetryCount((count) => count + 1);
+          }}
         />
       </aside>
     </div>

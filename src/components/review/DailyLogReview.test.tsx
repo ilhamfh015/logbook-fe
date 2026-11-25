@@ -19,7 +19,14 @@ vi.mock("@/components/preview/TimelinePreview", () => ({
 }));
 
 vi.mock("@/components/review/ReviewDecisionPanel", () => ({
-  ReviewDecisionPanel: () => null,
+  ReviewDecisionPanel: ({ log, onUpdated }: {
+    log: ReviewDailyLog;
+    onUpdated: (log: ReviewDailyLog) => void;
+  }) => (
+    <button type="button" onClick={() => onUpdated({ ...log, status: "Disetujui" })}>
+      Uji pembaruan keputusan
+    </button>
+  ),
 }));
 
 const reviewLog: ReviewDailyLog = {
@@ -66,5 +73,17 @@ describe("DailyLogReview", () => {
     expect(await screen.findByText("Belum ada Daily Log untuk tanggal ini.")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Coba lagi" })).not.toBeInTheDocument();
+  });
+
+  it("memperbarui status layar dari hasil keputusan", async () => {
+    const { user } = await import("@testing-library/user-event").then(({ default: userEvent }) => ({
+      user: userEvent.setup(),
+    }));
+    render(<DailyLogReview userId="2" dateIso="2026-11-17" />);
+
+    await screen.findByText("Menunggu");
+    await user.click(screen.getByRole("button", { name: "Uji pembaruan keputusan" }));
+
+    expect(await screen.findByText("Disetujui")).toBeInTheDocument();
   });
 });
