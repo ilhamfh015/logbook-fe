@@ -62,6 +62,16 @@ export type TeamMemberDto = {
   pendingDays?: number | null;
 };
 
+/** Elemen array GET /api/team/pending-days. */
+export type TeamPendingDayDto = {
+  userId?: number | null;
+  dailyLogId?: number | null;
+  date?: string | null;
+  totalDurationMinutes?: number | null;
+  submittedAt?: string | null;
+  autoSubmitted?: boolean | null;
+};
+
 /** Elemen array GET /api/admin/daily-logs?date=&userId=&status=. */
 export type AdminDailyLogDto = {
   id?: number | null;

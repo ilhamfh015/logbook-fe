@@ -14,8 +14,14 @@ import {
 } from "lucide-react";
 import { ErrorNotice } from "@/components/shared/ErrorNotice";
 import { itemsFromApiError } from "@/lib/errorItems";
-import { mapTeamMember, type TeamMemberRow, type TeamMemberStatus } from "@/lib/teamMapper";
-import { getTeam } from "@/services/teamService";
+import {
+  mapPendingDaysByUser,
+  mapTeamMember,
+  type TeamMemberRow,
+  type TeamMemberStatus,
+  type TeamPendingItem,
+} from "@/lib/teamMapper";
+import { getPendingDays, getTeam } from "@/services/teamService";
 
 const formatDate = (dateKey: string) =>
   new Intl.DateTimeFormat("id-ID", {
@@ -45,6 +51,12 @@ export function TeamDashboard({
     members: TeamMemberRow[];
     errorItems: ReturnType<typeof itemsFromApiError>;
   }>({ key: -1, members: [], errorItems: [] });
+  const [pendingDaysResult, setPendingDaysResult] = useState<{
+    key: number;
+    count: number;
+    byUser: Map<number, TeamPendingItem[]>;
+    failed: boolean;
+  }>({ key: -1, count: 0, byUser: new Map(), failed: false });
   const requestKey = retryCount;
 
   useEffect(() => {
@@ -67,6 +79,23 @@ export function TeamDashboard({
       })
       .catch(() => undefined);
 
+    getPendingDays()
+      .then((days) => {
+        if (active) {
+          setPendingDaysResult({
+            key: requestKey,
+            count: days.length,
+            byUser: mapPendingDaysByUser(days),
+            failed: false,
+          });
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setPendingDaysResult({ key: requestKey, count: 0, byUser: new Map(), failed: true });
+        }
+      });
+
     return () => {
       active = false;
     };
@@ -77,9 +106,13 @@ export function TeamDashboard({
   const errorItems = loading ? [] : requestResult.errorItems;
   const hasError = errorItems.length > 0;
   const summaryReady = !loading && !hasError;
+  const pendingDaysLoaded = pendingDaysResult.key === requestKey && !pendingDaysResult.failed;
+  const pendingDaysFailed = pendingDaysResult.key === requestKey && pendingDaysResult.failed;
   const todayDate = members.find((member) => member.date)?.date ?? dateKeyFromDate(new Date());
   const reviewBasePath = isAdminAudience ? "/admin/tim" : "/tim";
-  const pendingDays = members.reduce((total, member) => total + member.pendingDays, 0);
+  const pendingDays = pendingDaysLoaded
+    ? pendingDaysResult.count
+    : members.reduce((total, member) => total + member.pendingDays, 0);
   const revisionCount = members.filter((member) => member.status === "Perbaikan diajukan").length;
   const leaveCount = members.filter((member) => member.status === "Cuti" || member.status === "Libur").length;
 
@@ -234,16 +267,37 @@ export function TeamDashboard({
                   </td>
 
                   <td className="px-5 py-4">
-                    {member.pending.length > 0 ? (
+                    {(pendingDaysLoaded
+                      ? pendingDaysResult.byUser.get(member.id) ?? []
+                      : member.pending).length > 0 ? (
                       <div className="space-y-1">
-                        {member.pending.map((item) => item.date ? (
-                          <Link
-                            key={`${member.id}-${item.date}`}
-                            href={`${reviewBasePath}/${member.id}/${item.date}`}
-                            className="block text-xs text-slate-600"
-                          >
-                            {item.text}
-                          </Link>
+                        {(pendingDaysLoaded
+                          ? pendingDaysResult.byUser.get(member.id) ?? []
+                          : member.pending).map((item) => item.date ? (
+                          pendingDaysLoaded ? (
+                            <span key={`${member.id}-${item.date}`} className="inline-flex flex-wrap items-center gap-1.5">
+                              <Link
+                                href={`${reviewBasePath}/${member.id}/${item.date}`}
+                                aria-label={`Buka Daily Log ${member.name} ${item.text}`}
+                                className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                              >
+                                {item.text}
+                              </Link>
+                              {item.autoSubmitted && (
+                                <span className="rounded-full bg-teal-50 px-2 py-1 text-[10px] font-medium text-teal-700">
+                                  terkirim otomatis
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <Link
+                              key={`${member.id}-${item.date}`}
+                              href={`${reviewBasePath}/${member.id}/${item.date}`}
+                              className="block text-xs text-slate-600"
+                            >
+                              {item.text}
+                            </Link>
+                          )
                         ) : (
                           <p key={`${member.id}-${item.text}`} className="text-xs text-slate-600">
                             {item.text}
@@ -276,8 +330,13 @@ export function TeamDashboard({
             Setujui dan Tolak ada di halaman tersebut. Jam = total harian,
             aktivitas paralel dihitung sekali.
           </p>
-          <p className="mt-1 text-xs text-amber-700">
-            Menampilkan status hari ini. Daftar lengkap hari menunggu keputusan akan ditampilkan setelah tersedia dari server.
+          {pendingDaysFailed && (
+            <p className="mt-1 text-xs text-slate-500">
+              Daftar hari menunggu belum dapat dimuat.
+            </p>
+          )}
+          <p className="mt-1 text-xs text-slate-500">
+            Status hari ini ditampilkan. Tanggal lain belum dapat dipilih.
           </p>
         </div>
       </section>

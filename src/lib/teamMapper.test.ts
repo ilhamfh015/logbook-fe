@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mapTeamMember } from "@/lib/teamMapper";
+import { mapPendingDaysByUser, mapTeamMember } from "@/lib/teamMapper";
+import type { TeamPendingDay } from "@/services/teamService";
 import type { TeamMemberDto } from "@/types/reviewApi";
 
 function member(overrides: Partial<TeamMemberDto> = {}): TeamMemberDto {
@@ -59,7 +60,7 @@ describe("mapTeamMember", () => {
     }));
 
     expect(row.pending).toEqual([
-      { text: "Sel, 17 Nov · 7 j", date: "2026-11-17" },
+      { text: "Sel 17 Nov · 7 j", date: "2026-11-17" },
       { text: "2 hari menunggu", date: null },
     ]);
   });
@@ -79,5 +80,48 @@ describe("mapTeamMember", () => {
       dailyLogId: null,
       pendingDays: 1,
     })).pending).toEqual([{ text: "1 hari menunggu", date: null }]);
+  });
+});
+
+describe("mapPendingDaysByUser", () => {
+  it("groups days by user, sorts ascending, and formats optional data safely", () => {
+    const days: TeamPendingDay[] = [
+      {
+        userId: 17,
+        dailyLogId: 91,
+        date: "2026-11-24",
+        totalDurationMinutes: null,
+        submittedAt: null,
+        autoSubmitted: true,
+      },
+      {
+        userId: 21,
+        dailyLogId: 92,
+        date: "2026-11-09",
+        totalDurationMinutes: 450,
+        submittedAt: null,
+        autoSubmitted: false,
+      },
+      {
+        userId: 17,
+        dailyLogId: 93,
+        date: "2026-11-06",
+        totalDurationMinutes: 480,
+        submittedAt: null,
+        autoSubmitted: false,
+      },
+    ];
+
+    expect(mapPendingDaysByUser(days)).toEqual(new Map([
+      [17, [
+        { text: "Jum 6 Nov · 8 j", date: "2026-11-06", autoSubmitted: false },
+        { text: "Sel 24 Nov", date: "2026-11-24", autoSubmitted: true },
+      ]],
+      [21, [{ text: "Sen 9 Nov · 7 j 30 m", date: "2026-11-09", autoSubmitted: false }]],
+    ]));
+  });
+
+  it("returns an empty grouping for an empty response", () => {
+    expect(mapPendingDaysByUser([])).toEqual(new Map());
   });
 });
