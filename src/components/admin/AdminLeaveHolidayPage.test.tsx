@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminLeaveHolidayPage } from "@/components/admin/AdminLeaveHolidayPage";
 import { adminService, type AdminLeave, type AdminTalent } from "@/services/adminService";
@@ -49,6 +49,16 @@ describe("AdminLeaveHolidayPage kolom Talent", () => {
     await waitFor(() => {
       expect(screen.getByRole("cell", { name: "Rina Talent" })).toBeInTheDocument();
     });
+  });
+
+  it("menampilkan daftar nama talent pada dropdown tambah cuti", async () => {
+    vi.mocked(adminService.getLeaves).mockResolvedValue([]);
+
+    render(<AdminLeaveHolidayPage />);
+
+    const select = await screen.findByRole("combobox", { name: "Talent" });
+    expect(within(select).getByRole("option", { name: "Pilih talent" })).toBeInTheDocument();
+    expect(within(select).getByRole("option", { name: "Rina Talent" })).toHaveValue("10");
   });
 
   it("memakai daftar talent sebagai fallback bila respons API tanpa full_name", async () => {
