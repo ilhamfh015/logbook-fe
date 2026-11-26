@@ -2,6 +2,7 @@ import { apiFetch } from "@/services/apiClient";
 import type { TeamMemberDto, TeamPendingDayDto } from "@/types/reviewApi";
 
 export type TeamScope = "ATASAN" | "ADMIN";
+export type TeamPendingDayStatus = "MENUNGGU" | "PERBAIKAN_DIAJUKAN";
 
 export type TeamPendingDay = {
   userId: number;
@@ -17,8 +18,11 @@ export async function getTeam(scope: TeamScope = "ATASAN"): Promise<TeamMemberDt
   return Array.isArray(response) ? response as TeamMemberDto[] : [];
 }
 
-export async function getPendingDays(): Promise<TeamPendingDay[]> {
-  const response = await apiFetch<unknown>("/api/team/pending-days");
+export async function getPendingDays(status?: TeamPendingDayStatus): Promise<TeamPendingDay[]> {
+  const path = status
+    ? `/api/team/pending-days?status=${status}`
+    : "/api/team/pending-days";
+  const response = await apiFetch<unknown>(path);
   if (!Array.isArray(response)) return [];
 
   return response.flatMap((item: TeamPendingDayDto | null) => {

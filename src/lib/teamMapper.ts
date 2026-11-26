@@ -10,7 +10,10 @@ export type TeamPendingItem = {
   text: string;
   date: string | null;
   autoSubmitted?: boolean;
+  kind?: TeamPendingKind;
 };
+
+export type TeamPendingKind = "menunggu" | "perbaikan";
 
 export type TeamMemberRow = {
   id: number;
@@ -20,6 +23,7 @@ export type TeamMemberRow = {
   status: TeamMemberStatus;
   hours: string;
   pending: TeamPendingItem[];
+  todayRevision: TeamPendingItem | null;
   date: string | null;
   pendingDays: number;
 };
@@ -32,13 +36,20 @@ export function mapTeamMember(dto: TeamMemberDto): TeamMemberRow {
   const date = isDateKey(dto.date) ? dto.date : null;
   const pending: TeamPendingItem[] = [];
   const hasTodayPendingLog = statusCode === "MENUNGGU" && dto.dailyLogId != null;
+  const rawDurationMinutes = dto.totalDurationMinutes;
+  const hasDuration = finiteNonNegativeNumber(rawDurationMinutes);
+  const durationMinutes = hasDuration ? rawDurationMinutes : 0;
+  const todayRevision = status === "Perbaikan diajukan" && date
+    ? {
+      text: `${formatPendingDate(date)}${hasDuration ? ` · ${formatHours(durationMinutes)}` : ""}`,
+      date,
+      kind: "perbaikan" as const,
+    }
+    : null;
 
   if (hasTodayPendingLog && date) {
-    const minutes = finiteNonNegativeNumber(dto.totalDurationMinutes)
-      ? dto.totalDurationMinutes
-      : 0;
     pending.push({
-      text: `${formatPendingDate(date)} · ${formatHours(minutes)}`,
+      text: `${formatPendingDate(date)} · ${formatHours(durationMinutes)}`,
       date,
     });
   }
@@ -48,10 +59,6 @@ export function mapTeamMember(dto: TeamMemberDto): TeamMemberRow {
     pending.push({ text: `${remainingPendingDays} hari menunggu`, date: null });
   }
 
-  const durationMinutes = finiteNonNegativeNumber(dto.totalDurationMinutes)
-    ? dto.totalDurationMinutes
-    : 0;
-
   return {
     id: finiteNonNegativeNumber(dto.userId) ? dto.userId : 0,
     name,
@@ -60,12 +67,16 @@ export function mapTeamMember(dto: TeamMemberDto): TeamMemberRow {
     status,
     hours: formatHours(durationMinutes),
     pending,
+    todayRevision,
     date,
     pendingDays,
   };
 }
 
-export function mapPendingDaysByUser(days: TeamPendingDay[]): Map<number, TeamPendingItem[]> {
+export function mapPendingDaysByUser(
+  days: TeamPendingDay[],
+  kind?: TeamPendingKind,
+): Map<number, TeamPendingItem[]> {
   const grouped = new Map<number, TeamPendingItem[]>();
 
   for (const day of days) {
@@ -77,6 +88,7 @@ export function mapPendingDaysByUser(days: TeamPendingDay[]): Map<number, TeamPe
       text: `${formatPendingDate(day.date)}${duration}`,
       date: day.date,
       autoSubmitted: day.autoSubmitted,
+      ...(kind ? { kind } : {}),
     });
     grouped.set(day.userId, items);
   }
@@ -86,6 +98,28 @@ export function mapPendingDaysByUser(days: TeamPendingDay[]): Map<number, TeamPe
   }
 
   return grouped;
+}
+
+export function mergePendingDaysByUser(
+  ...groups: Array<Map<number, TeamPendingItem[]>>
+): Map<number, TeamPendingItem[]> {
+  const merged = new Map<number, TeamPendingItem[]>();
+
+  for (const group of groups) {
+    for (const [userId, items] of group) {
+      merged.set(userId, [...(merged.get(userId) ?? []), ...items]);
+    }
+  }
+
+  for (const items of merged.values()) {
+    items.sort((left, right) => {
+      if (left.date === null) return right.date === null ? 0 : 1;
+      if (right.date === null) return -1;
+      return left.date.localeCompare(right.date);
+    });
+  }
+
+  return merged;
 }
 
 function mapStatus(code: string): TeamMemberStatus {

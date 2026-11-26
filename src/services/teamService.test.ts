@@ -56,6 +56,15 @@ describe("getPendingDays", () => {
     expect(mockedApiFetch).toHaveBeenCalledWith("/api/team/pending-days");
   });
 
+  it("requests repair days with the supported status filter", async () => {
+    mockedApiFetch.mockResolvedValue([]);
+
+    await expect(getPendingDays("PERBAIKAN_DIAJUKAN")).resolves.toEqual([]);
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      "/api/team/pending-days?status=PERBAIKAN_DIAJUKAN",
+    );
+  });
+
   it("returns an empty list for empty or malformed response data", async () => {
     mockedApiFetch.mockResolvedValueOnce([]);
     await expect(getPendingDays()).resolves.toEqual([]);
@@ -90,5 +99,12 @@ describe("getPendingDays", () => {
     mockedApiFetch.mockRejectedValue(error);
 
     await expect(getPendingDays()).rejects.toBe(error);
+  });
+
+  it("passes filtered HTTP errors through unchanged", async () => {
+    const error = new ApiError(400, "Nilai parameter status tidak valid");
+    mockedApiFetch.mockRejectedValue(error);
+
+    await expect(getPendingDays("PERBAIKAN_DIAJUKAN")).rejects.toBe(error);
   });
 });

@@ -16,6 +16,7 @@ import { ErrorNotice } from "@/components/shared/ErrorNotice";
 import { itemsFromApiError } from "@/lib/errorItems";
 import {
   mapPendingDaysByUser,
+  mergePendingDaysByUser,
   mapTeamMember,
   type TeamMemberRow,
   type TeamMemberStatus,
@@ -57,44 +58,60 @@ export function TeamDashboard({
     byUser: Map<number, TeamPendingItem[]>;
     failed: boolean;
   }>({ key: -1, count: 0, byUser: new Map(), failed: false });
+  const [repairDaysResult, setRepairDaysResult] = useState<{
+    key: number;
+    count: number;
+    byUser: Map<number, TeamPendingItem[]>;
+    failed: boolean;
+  }>({ key: -1, count: 0, byUser: new Map(), failed: false });
   const requestKey = retryCount;
 
   useEffect(() => {
     let active = true;
 
-    getTeam(isAdminAudience ? "ADMIN" : "ATASAN")
-      .then((result) => {
-        if (active) {
-          setRequestResult({
-            key: requestKey,
-            members: result.map(mapTeamMember),
-            errorItems: [],
-          });
-        }
-      })
-      .catch((error: unknown) => {
-        if (active) {
-          setRequestResult({ key: requestKey, members: [], errorItems: itemsFromApiError(error) });
-        }
-      })
-      .catch(() => undefined);
+    Promise.allSettled([
+      getTeam(isAdminAudience ? "ADMIN" : "ATASAN"),
+      getPendingDays(),
+      getPendingDays("PERBAIKAN_DIAJUKAN"),
+    ]).then(([teamResult, pendingResult, repairResult]) => {
+      if (!active) return;
 
-    getPendingDays()
-      .then((days) => {
-        if (active) {
-          setPendingDaysResult({
-            key: requestKey,
-            count: days.length,
-            byUser: mapPendingDaysByUser(days),
-            failed: false,
-          });
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setPendingDaysResult({ key: requestKey, count: 0, byUser: new Map(), failed: true });
-        }
-      });
+      if (teamResult.status === "fulfilled") {
+        setRequestResult({
+          key: requestKey,
+          members: teamResult.value.map(mapTeamMember),
+          errorItems: [],
+        });
+      } else {
+        setRequestResult({
+          key: requestKey,
+          members: [],
+          errorItems: itemsFromApiError(teamResult.reason),
+        });
+      }
+
+      if (pendingResult.status === "fulfilled") {
+        setPendingDaysResult({
+          key: requestKey,
+          count: pendingResult.value.length,
+          byUser: mapPendingDaysByUser(pendingResult.value, "menunggu"),
+          failed: false,
+        });
+      } else {
+        setPendingDaysResult({ key: requestKey, count: 0, byUser: new Map(), failed: true });
+      }
+
+      if (repairResult.status === "fulfilled") {
+        setRepairDaysResult({
+          key: requestKey,
+          count: repairResult.value.length,
+          byUser: mapPendingDaysByUser(repairResult.value, "perbaikan"),
+          failed: false,
+        });
+      } else {
+        setRepairDaysResult({ key: requestKey, count: 0, byUser: new Map(), failed: true });
+      }
+    });
 
     return () => {
       active = false;
@@ -108,13 +125,30 @@ export function TeamDashboard({
   const summaryReady = !loading && !hasError;
   const pendingDaysLoaded = pendingDaysResult.key === requestKey && !pendingDaysResult.failed;
   const pendingDaysFailed = pendingDaysResult.key === requestKey && pendingDaysResult.failed;
+  const repairDaysLoaded = repairDaysResult.key === requestKey && !repairDaysResult.failed;
+  const repairDaysFailed = repairDaysResult.key === requestKey && repairDaysResult.failed;
   const todayDate = members.find((member) => member.date)?.date ?? dateKeyFromDate(new Date());
   const reviewBasePath = isAdminAudience ? "/admin/tim" : "/tim";
   const pendingDays = pendingDaysLoaded
     ? pendingDaysResult.count
     : members.reduce((total, member) => total + member.pendingDays, 0);
-  const revisionCount = members.filter((member) => member.status === "Perbaikan diajukan").length;
+  const revisionCount = repairDaysLoaded
+    ? repairDaysResult.count
+    : members.filter((member) => member.status === "Perbaikan diajukan").length;
   const leaveCount = members.filter((member) => member.status === "Cuti" || member.status === "Libur").length;
+  const fallbackWaitingByUser = new Map(members.map((member) => [
+    member.id,
+    member.pending.map((item) => ({ ...item, kind: "menunggu" as const })),
+  ]));
+  const fallbackRepairByUser = new Map<number, TeamPendingItem[]>(
+    members.flatMap((member): Array<[number, TeamPendingItem[]]> => (
+      member.todayRevision ? [[member.id, [member.todayRevision]]] : []
+    )),
+  );
+  const pendingItemsByUser = mergePendingDaysByUser(
+    pendingDaysLoaded ? pendingDaysResult.byUser : fallbackWaitingByUser,
+    repairDaysLoaded ? repairDaysResult.byUser : fallbackRepairByUser,
+  );
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-5 py-7 lg:px-8">
@@ -267,42 +301,46 @@ export function TeamDashboard({
                   </td>
 
                   <td className="px-5 py-4">
-                    {(pendingDaysLoaded
-                      ? pendingDaysResult.byUser.get(member.id) ?? []
-                      : member.pending).length > 0 ? (
+                    {(pendingItemsByUser.get(member.id) ?? []).length > 0 ? (
                       <div className="space-y-1">
-                        {(pendingDaysLoaded
-                          ? pendingDaysResult.byUser.get(member.id) ?? []
-                          : member.pending).map((item) => item.date ? (
-                          pendingDaysLoaded ? (
-                            <span key={`${member.id}-${item.date}`} className="inline-flex flex-wrap items-center gap-1.5">
+                        {(pendingItemsByUser.get(member.id) ?? []).map((item) => {
+                          const isRepair = item.kind === "perbaikan";
+                          const itemKey = `${member.id}-${item.kind ?? "menunggu"}-${item.date ?? item.text}`;
+
+                          if (!item.date) {
+                            return (
+                              <p key={itemKey} className="text-xs text-slate-600">
+                                {item.text}
+                              </p>
+                            );
+                          }
+
+                          return (
+                            <span key={itemKey} className="inline-flex flex-wrap items-center gap-1.5">
                               <Link
                                 href={`${reviewBasePath}/${member.id}/${item.date}`}
-                                aria-label={`Buka Daily Log ${member.name} ${item.text}`}
-                                className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                                aria-label={isRepair
+                                  ? `Buka perbaikan Daily Log ${member.name} ${item.text}`
+                                  : `Buka Daily Log ${member.name} ${item.text}`}
+                                className={`inline-flex rounded-full px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${isRepair
+                                  ? "bg-cyan-100 text-cyan-900 hover:bg-cyan-200"
+                                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
                               >
                                 {item.text}
                               </Link>
+                              {isRepair && (
+                                <span className="rounded-full bg-cyan-100 px-2 py-1 text-[10px] font-medium text-cyan-900">
+                                  Perbaikan diajukan
+                                </span>
+                              )}
                               {item.autoSubmitted && (
                                 <span className="rounded-full bg-teal-50 px-2 py-1 text-[10px] font-medium text-teal-700">
                                   terkirim otomatis
                                 </span>
                               )}
                             </span>
-                          ) : (
-                            <Link
-                              key={`${member.id}-${item.date}`}
-                              href={`${reviewBasePath}/${member.id}/${item.date}`}
-                              className="block text-xs text-slate-600"
-                            >
-                              {item.text}
-                            </Link>
-                          )
-                        ) : (
-                          <p key={`${member.id}-${item.text}`} className="text-xs text-slate-600">
-                            {item.text}
-                          </p>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <span className="text-xs text-slate-400">Tidak ada</span>
@@ -333,6 +371,11 @@ export function TeamDashboard({
           {pendingDaysFailed && (
             <p className="mt-1 text-xs text-slate-500">
               Daftar hari menunggu belum dapat dimuat.
+            </p>
+          )}
+          {repairDaysFailed && (
+            <p className="mt-1 text-xs text-slate-500">
+              Daftar perbaikan belum dapat dimuat.
             </p>
           )}
           <p className="mt-1 text-xs text-slate-500">

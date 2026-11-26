@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mapPendingDaysByUser, mapTeamMember } from "@/lib/teamMapper";
+import {
+  mapPendingDaysByUser,
+  mapTeamMember,
+  mergePendingDaysByUser,
+} from "@/lib/teamMapper";
 import type { TeamPendingDay } from "@/services/teamService";
 import type { TeamMemberDto } from "@/types/reviewApi";
 
@@ -81,6 +85,30 @@ describe("mapTeamMember", () => {
       pendingDays: 1,
     })).pending).toEqual([{ text: "1 hari menunggu", date: null }]);
   });
+
+  it("maps today's repair as the legacy fallback chip", () => {
+    expect(mapTeamMember(member({
+      status: "PERBAIKAN_DIAJUKAN",
+      date: "2026-11-09",
+      totalDurationMinutes: 450,
+    })).todayRevision).toEqual({
+      text: "Sen 9 Nov · 7 j 30 m",
+      date: "2026-11-09",
+      kind: "perbaikan",
+    });
+  });
+
+  it("keeps the legacy repair fallback date-only when duration is null", () => {
+    expect(mapTeamMember(member({
+      status: "PERBAIKAN_DIAJUKAN",
+      date: "2026-11-09",
+      totalDurationMinutes: null,
+    })).todayRevision).toEqual({
+      text: "Sen 9 Nov",
+      date: "2026-11-09",
+      kind: "perbaikan",
+    });
+  });
 });
 
 describe("mapPendingDaysByUser", () => {
@@ -123,5 +151,39 @@ describe("mapPendingDaysByUser", () => {
 
   it("returns an empty grouping for an empty response", () => {
     expect(mapPendingDaysByUser([])).toEqual(new Map());
+  });
+
+  it("marks grouped days by source and merges mixed kinds in ascending date order", () => {
+    const waiting = mapPendingDaysByUser([{
+      userId: 17,
+      dailyLogId: 91,
+      date: "2026-11-09",
+      totalDurationMinutes: 450,
+      submittedAt: null,
+      autoSubmitted: false,
+    }], "menunggu");
+    const repairs = mapPendingDaysByUser([{
+      userId: 17,
+      dailyLogId: 92,
+      date: "2026-11-06",
+      totalDurationMinutes: null,
+      submittedAt: null,
+      autoSubmitted: true,
+    }], "perbaikan");
+
+    expect(mergePendingDaysByUser(waiting, repairs).get(17)).toEqual([
+      {
+        text: "Jum 6 Nov",
+        date: "2026-11-06",
+        autoSubmitted: true,
+        kind: "perbaikan",
+      },
+      {
+        text: "Sen 9 Nov · 7 j 30 m",
+        date: "2026-11-09",
+        autoSubmitted: false,
+        kind: "menunggu",
+      },
+    ]);
   });
 });

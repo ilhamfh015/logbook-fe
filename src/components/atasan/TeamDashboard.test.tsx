@@ -12,6 +12,13 @@ vi.mock("@/services/teamService", () => ({
 
 const mockedGetTeam = vi.mocked(getTeam);
 const mockedGetPendingDays = vi.mocked(getPendingDays);
+type PendingDay = Awaited<ReturnType<typeof getPendingDays>>[number];
+
+function mockPendingDays(waiting: PendingDay[] = [], repairs: PendingDay[] = []) {
+  mockedGetPendingDays.mockImplementation(async (status) => (
+    status === "PERBAIKAN_DIAJUKAN" ? repairs : waiting
+  ));
+}
 
 const teamResponse = [
   {
@@ -31,7 +38,7 @@ describe("TeamDashboard", () => {
   beforeEach(() => {
     mockedGetTeam.mockReset();
     mockedGetPendingDays.mockReset();
-    mockedGetPendingDays.mockResolvedValue([]);
+    mockPendingDays();
   });
 
   it("menampilkan loading lalu anggota dengan tautan aktif", async () => {
@@ -39,7 +46,7 @@ describe("TeamDashboard", () => {
     mockedGetTeam.mockReturnValue(new Promise((resolve) => {
       resolveTeam = resolve;
     }));
-    mockedGetPendingDays.mockResolvedValue([{
+    mockPendingDays([{
       userId: 27,
       dailyLogId: 73,
       date: "2026-11-17",
@@ -134,7 +141,7 @@ describe("TeamDashboard", () => {
       ...teamResponse,
       { ...teamResponse[0], userId: 28, fullName: "Sari Aulia", status: "DRAF", pendingDays: 0 },
     ]);
-    mockedGetPendingDays.mockResolvedValue([
+    mockPendingDays([
       {
         userId: 27,
         dailyLogId: 74,
@@ -174,11 +181,12 @@ describe("TeamDashboard", () => {
     expect(screen.getAllByText("terkirim otomatis")).toHaveLength(1);
     expect(screen.getByText("Menunggu keputusan").closest("article")).toHaveTextContent("3 hari");
     expect(mockedGetPendingDays).toHaveBeenCalledWith();
+    expect(mockedGetPendingDays).toHaveBeenCalledWith("PERBAIKAN_DIAJUKAN");
   });
 
   it("menampilkan Tidak ada untuk anggota tanpa hari menunggu", async () => {
     mockedGetTeam.mockResolvedValue(teamResponse);
-    mockedGetPendingDays.mockResolvedValue([]);
+    mockPendingDays();
 
     render(<TeamDashboard />);
 
@@ -188,7 +196,10 @@ describe("TeamDashboard", () => {
 
   it("memakai fallback pendingDays dan pesan netral bila daftar gagal dimuat", async () => {
     mockedGetTeam.mockResolvedValue(teamResponse);
-    mockedGetPendingDays.mockRejectedValue(new ApiError(403, "Tidak memiliki akses."));
+    mockedGetPendingDays.mockImplementation(async (status) => {
+      if (status === "PERBAIKAN_DIAJUKAN") return [];
+      throw new ApiError(403, "Tidak memiliki akses.");
+    });
 
     render(<TeamDashboard />);
 
@@ -197,5 +208,116 @@ describe("TeamDashboard", () => {
     expect(screen.getByText("Menunggu keputusan").closest("article")).toHaveTextContent("3 hari");
     expect(screen.getByText("2 hari menunggu")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("menampilkan chip perbaikan dan menunggu berurutan dengan hitungan terpisah", async () => {
+    mockedGetTeam.mockResolvedValue(teamResponse);
+    mockPendingDays([{
+      userId: 27,
+      dailyLogId: 73,
+      date: "2026-11-09",
+      totalDurationMinutes: 450,
+      submittedAt: "2026-11-10T01:00:00Z",
+      autoSubmitted: true,
+    }], [{
+      userId: 27,
+      dailyLogId: 74,
+      date: "2026-11-06",
+      totalDurationMinutes: 450,
+      submittedAt: "2026-11-07T01:00:00Z",
+      autoSubmitted: true,
+    }]);
+
+    render(<TeamDashboard />);
+
+    expect(await screen.findByText("Rina Aulia")).toBeInTheDocument();
+    const row = screen.getByText("Rina Aulia").closest("tr");
+    expect(row).not.toBeNull();
+    const pendingCell = within(row!).getAllByRole("cell")[3];
+    const dayLinks = within(pendingCell).getAllByRole("link");
+
+    expect(dayLinks.map((link) => link.getAttribute("href"))).toEqual([
+      "/tim/27/2026-11-06",
+      "/tim/27/2026-11-09",
+    ]);
+    expect(screen.getByRole("link", {
+      name: "Buka perbaikan Daily Log Rina Aulia Jum 6 Nov · 7 j 30 m",
+    })).toHaveClass("bg-cyan-100");
+    expect(screen.getByText("Perbaikan diajukan", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByRole("link", {
+      name: "Buka Daily Log Rina Aulia Sen 9 Nov · 7 j 30 m",
+    })).toHaveClass("bg-slate-100");
+    expect(screen.getAllByText("terkirim otomatis")).toHaveLength(2);
+    expect(screen.getByText("Menunggu keputusan", { selector: "p" }).closest("article"))
+      .toHaveTextContent("1 hari");
+    expect(screen.getByText("Perbaikan diajukan", { selector: "p" }).closest("article"))
+      .toHaveTextContent("1");
+  });
+
+  it("mempertahankan daftar menunggu dan memakai fallback perbaikan jika daftar perbaikan gagal", async () => {
+    mockedGetTeam.mockResolvedValue([{
+      ...teamResponse[0],
+      status: "PERBAIKAN_DIAJUKAN",
+    }]);
+    mockedGetPendingDays.mockImplementation(async (status) => {
+      if (status === "PERBAIKAN_DIAJUKAN") {
+        throw new ApiError(404, "Tidak ditemukan.");
+      }
+      return [{
+        userId: 27,
+        dailyLogId: 75,
+        date: "2026-11-09",
+        totalDurationMinutes: 450,
+        submittedAt: "2026-11-10T01:00:00Z",
+        autoSubmitted: false,
+      }];
+    });
+
+    render(<TeamDashboard />);
+
+    expect(await screen.findByText("Rina Aulia")).toBeInTheDocument();
+    expect(screen.getByText("Daftar perbaikan belum dapat dimuat.")).toBeInTheDocument();
+    expect(screen.getByRole("link", {
+      name: "Buka perbaikan Daily Log Rina Aulia Sel 17 Nov · 7 j",
+    })).toHaveAttribute("href", "/tim/27/2026-11-17");
+    expect(screen.getByRole("link", {
+      name: "Buka Daily Log Rina Aulia Sen 9 Nov · 7 j 30 m",
+    })).toBeInTheDocument();
+    expect(screen.getByText("Perbaikan diajukan", { selector: "p" }).closest("article"))
+      .toHaveTextContent("1");
+  });
+
+  it("mempertahankan daftar perbaikan dan memakai fallback menunggu jika daftar menunggu gagal", async () => {
+    mockedGetTeam.mockResolvedValue([{
+      ...teamResponse[0],
+      status: "PERBAIKAN_DIAJUKAN",
+      pendingDays: 3,
+    }]);
+    mockedGetPendingDays.mockImplementation(async (status) => {
+      if (status === "PERBAIKAN_DIAJUKAN") {
+        return [{
+          userId: 27,
+          dailyLogId: 76,
+          date: "2026-11-06",
+          totalDurationMinutes: null,
+          submittedAt: "2026-11-07T01:00:00Z",
+          autoSubmitted: false,
+        }];
+      }
+      throw new ApiError(400, "Gagal memuat.");
+    });
+
+    render(<TeamDashboard />);
+
+    expect(await screen.findByText("Rina Aulia")).toBeInTheDocument();
+    expect(screen.getByText("Daftar hari menunggu belum dapat dimuat.")).toBeInTheDocument();
+    expect(screen.getByText("3 hari menunggu")).toBeInTheDocument();
+    expect(screen.getByRole("link", {
+      name: "Buka perbaikan Daily Log Rina Aulia Jum 6 Nov",
+    })).toHaveAttribute("href", "/tim/27/2026-11-06");
+    expect(screen.getByText("Menunggu keputusan", { selector: "p" }).closest("article"))
+      .toHaveTextContent("3 hari");
+    expect(screen.getByText("Perbaikan diajukan", { selector: "p" }).closest("article"))
+      .toHaveTextContent("1");
   });
 });
