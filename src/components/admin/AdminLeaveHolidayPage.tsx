@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import Select from "react-select";
 import {
   CalendarDays,
   CalendarOff,
@@ -385,19 +386,17 @@ export function AdminLeaveHolidayPage() {
           <form onSubmit={handleAddLeave} className="space-y-4 border-t border-slate-100 bg-slate-50/70 p-5">
             <h3 className="text-sm font-bold text-ink">Tambah cuti</h3>
             <Field label="Talent" htmlFor="leave-user">
-              <select
+              <Select
                 id="leave-user"
-                required
-                value={leaveUserId}
-                onChange={(event) => setLeaveUserId(event.target.value)}
-                className={fieldClass}
-                disabled={loading || talents.length === 0}
-              >
-                <option value="">Pilih talent</option>
-                {talents.map((talent) => (
-                  <option key={talent.id} value={talent.id}>{talent.full_name}</option>
-                ))}
-              </select>
+                options={talents.map((t) => ({ value: String(t.id), label: t.full_name }))}
+                value={talents.find((t) => String(t.id) === leaveUserId) ? { value: leaveUserId, label: talents.find((t) => String(t.id) === leaveUserId)!.full_name } : null}
+                onChange={(option) => setLeaveUserId(option ? option.value : "")}
+                placeholder="Pilih atau cari talent..."
+                noOptionsMessage={() => "Talent tidak ditemukan"}
+                classNamePrefix="react-select"
+                className="text-sm"
+                isDisabled={loading || talents.length === 0}
+              />
             </Field>
             {talents.length === 0 && !loading ? (
               <p className="text-xs text-amber-700">Belum ada talent aktif yang dapat dipilih.</p>

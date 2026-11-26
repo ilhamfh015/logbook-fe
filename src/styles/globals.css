@@ -28,4 +28,19 @@ button {
   .field-control {
     @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-[#1F2633] outline-none transition placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-blue-100;
   }
+  .react-select__control {
+    @apply w-full rounded-lg border border-slate-200 bg-white px-1 py-1 text-sm outline-none transition hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-blue-100;
+  }
+  .react-select__value-container {
+    @apply px-2;
+  }
+  .react-select__menu {
+    @apply mt-1 rounded-lg border border-slate-200 bg-white shadow-lg;
+  }
+  .react-select__option--is-focused {
+    @apply bg-blue-50 text-brand;
+  }
+  .react-select__option--is-selected {
+    @apply bg-brand text-white;
+  }
 }
