@@ -49,4 +49,55 @@ describe("ImportResult", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
+
+  it("menampilkan hasil validasi per baris termasuk baris yang gagal", () => {
+    render(
+      <ImportResult
+        created={1}
+        updated={1}
+        importedEmails={["rina@contoh.id"]}
+        rows={[
+          {
+            rowNumber: 2,
+            email: "rina@contoh.id",
+            status: "created",
+            message: "Pengguna berhasil dibuat",
+          },
+          {
+            rowNumber: 3,
+            email: "admin@contoh.id",
+            status: "updated",
+            message: "Pengguna berhasil diperbarui",
+          },
+          {
+            rowNumber: 4,
+            email: "invalid-email",
+            status: "failed",
+            message: "Format email tidak valid",
+          },
+        ]}
+        onFinish={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Hasil validasi per baris" }),
+    ).toBeInTheDocument();
+
+    expect(screen.getByText("Baris 2")).toBeInTheDocument();
+    expect(screen.getAllByText("rina@contoh.id")).toHaveLength(2);
+    expect(screen.getByText("Berhasil dibuat")).toBeInTheDocument();
+    expect(screen.getByText("Pengguna berhasil dibuat")).toBeInTheDocument();
+
+    expect(screen.getByText("Baris 3")).toBeInTheDocument();
+    expect(screen.getByText("Berhasil diperbarui")).toBeInTheDocument();
+    expect(
+      screen.getByText("Pengguna berhasil diperbarui"),
+    ).toBeInTheDocument();
+
+    expect(screen.getByText("Baris 4")).toBeInTheDocument();
+    expect(screen.getByText("invalid-email")).toBeInTheDocument();
+    expect(screen.getByText("Gagal")).toBeInTheDocument();
+    expect(screen.getByText("Format email tidak valid")).toBeInTheDocument();
+  });
 });

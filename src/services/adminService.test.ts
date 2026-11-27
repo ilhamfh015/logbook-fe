@@ -72,3 +72,40 @@ describe("adminService Daily Log", () => {
     });
   });
 });
+
+
+
+describe("adminService Import CSV", () => {
+  beforeEach(() => {
+    mockedApiFetch.mockReset();
+  });
+
+  it("mengirim file CSV melalui FormData ke endpoint import", async () => {
+    const file = new File(["email,nama"], "users.csv", {
+      type: "text/csv",
+    });
+
+    mockedApiFetch.mockResolvedValue({
+      created: 2,
+      updated: 1,
+      importedEmails: ["rina@contoh.id", "admin@contoh.id"],
+    });
+
+    await expect(adminService.importUsers(file)).resolves.toEqual({
+      created: 2,
+      updated: 1,
+      importedEmails: ["rina@contoh.id", "admin@contoh.id"],
+    });
+
+    expect(mockedApiFetch).toHaveBeenCalledOnce();
+
+    const [url, options] = mockedApiFetch.mock.calls[0];
+
+    expect(url).toBe("/api/admin/users/import");
+    expect(options).toMatchObject({
+      method: "POST",
+    });
+    expect(options?.body).toBeInstanceOf(FormData);
+    expect((options?.body as FormData).get("file")).toBe(file);
+  });
+});

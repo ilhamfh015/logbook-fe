@@ -1,3 +1,4 @@
+
 import { apiFetch } from "@/services/apiClient";
 import type {
   AdminDailyLogDto,
@@ -25,10 +26,18 @@ export type AdminLeave = {
   note: string | null;
 };
 
+export type AdminImportRowResult = {
+  rowNumber: number;
+  email: string;
+  status: "created" | "updated" | "failed";
+  message?: string;
+};
+
 export type AdminImportResponse = {
   created: number;
   updated: number;
   importedEmails: string[];
+  rows?: AdminImportRowResult[];
 };
 
 export type AdminDailyLogFilters = {
@@ -98,9 +107,12 @@ export const adminService = {
     }),
 
   deleteHoliday: (date: string) =>
-    apiFetch<{ message: string }>(`/api/admin/holidays/${encodeURIComponent(date)}`, {
-      method: "DELETE",
-    }),
+    apiFetch<{ message: string }>(
+      `/api/admin/holidays/${encodeURIComponent(date)}`,
+      {
+        method: "DELETE",
+      },
+    ),
 
   getLeaves: () => apiFetch<AdminLeave[]>("/api/admin/leaves"),
 

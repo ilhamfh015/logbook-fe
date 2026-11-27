@@ -8,7 +8,10 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { ImportResult } from "@/components/admin/ImportResult";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ApiError } from "@/services/apiClient";
-import { adminService, type AdminImportResponse } from "@/services/adminService";
+import {
+  adminService,
+  type AdminImportResponse,
+} from "@/services/adminService";
 
 export default function PenggunaPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -196,7 +199,9 @@ export default function PenggunaPage() {
                   disabled={!selectedFile || isImporting}
                   className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                 >
-                  {isImporting ? "Memvalidasi dan mengimpor..." : "Validasi dan impor"}
+                  {isImporting
+                    ? "Memvalidasi dan mengimpor..."
+                    : "Validasi dan impor"}
                 </button>
               </div>
             </div>
@@ -216,6 +221,7 @@ export default function PenggunaPage() {
                 created={importResult.created}
                 updated={importResult.updated}
                 importedEmails={importResult.importedEmails ?? []}
+                rows={importResult.rows ?? []}
                 onFinish={handleFinish}
               />
             ) : null}

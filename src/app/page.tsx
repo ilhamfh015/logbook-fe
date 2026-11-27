@@ -1,8 +1,41 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { TaskShowcase } from "@/components/preview/TaskShowcase";
+import OnboardingWizard from "@/components/settings/OnboardingWizard";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { settingsService } from "@/services/settingsService";
 
 export default function HomePage() {
+  const { user, loading } = useAuth();
+  const [showWizard, setShowWizard] = useState(false);
+  const [settingsChecked, setSettingsChecked] = useState(false);
+  useEffect(() => {
+    if (loading || !user || user.mustChangePassword) return;
+
+    let active = true;
+
+    settingsService
+      .getSettings()
+      .then((settings) => {
+        if (active) {
+          setShowWizard(!settings.onboarded);
+        }
+      })
+      .catch(() => {
+        if (active) setShowWizard(false);
+      })
+      .finally(() => {
+        if (active) setSettingsChecked(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [user, loading]);
+
   return (
     <main className="min-h-screen bg-surface text-ink">
       <div className="flex min-h-screen w-full">
@@ -23,6 +56,10 @@ export default function HomePage() {
           <TaskShowcase />
         </section>
       </div>
+
+      {settingsChecked && showWizard && (
+        <OnboardingWizard onComplete={() => setShowWizard(false)} />
+      )}
     </main>
   );
 }
