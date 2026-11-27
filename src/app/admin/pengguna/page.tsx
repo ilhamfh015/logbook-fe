@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
+import { Download, Upload, Info, FileSpreadsheet } from "lucide-react";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { ImportResult } from "@/components/admin/ImportResult";
@@ -79,13 +80,17 @@ export default function PenggunaPage() {
     }
   };
 
-  const handleFinish = () => {
-    setSelectedFile(null);
-    resetResult();
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+  const handleDownloadTemplate = () => {
+    const csvContent = "email,nama,jenis,email_atasan,admin,password\n" +
+                       "contoh@email.com,Nama Pengguna,USER,atasan@email.com,false,password123";
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "template_impor_pengguna.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (authLoading) {
@@ -127,72 +132,64 @@ export default function PenggunaPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold">Unggah file CSV</h2>
-
-              <div className="mt-5 grid gap-5 lg:grid-cols-2">
-                <div>
-                  <label
-                    htmlFor="csv-file"
-                    className="mb-2 block text-sm font-medium"
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Impor Pengguna
+                </h2>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="flex items-center gap-2 text-sm font-medium text-brand hover:text-blue-700"
                   >
-                    Pilih file CSV
-                  </label>
-
-                  <input
-                    ref={fileInputRef}
-                    id="csv-file"
-                    type="file"
-                    accept=".csv,text/csv"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-
-                  <div className="flex min-h-[90px] items-center gap-4 rounded-xl border border-dashed border-blue-300 bg-blue-50/50 p-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-800">
-                        {selectedFile
-                          ? selectedFile.name
-                          : "Belum ada file dipilih"}
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-500">
-                        {selectedFile
-                          ? `${(selectedFile.size / 1024).toFixed(1)} KB · CSV`
-                          : "Pilih file CSV dengan format UTF-8"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col justify-center">
-                  <p className="text-sm font-medium text-slate-700">
-                    Kolom wajib, urut:
-                  </p>
-
-                  <code className="mt-2 break-all rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                    email,nama,jenis,email_atasan,admin,password
-                  </code>
-
-                  <p className="mt-2 text-xs text-slate-500">
-                    Kolom password wajib minimal 6 karakter. Impor ulang
-                    memperbarui data dan password pengguna yang masih memakai
-                    password sementara; password yang sudah diganti tidak
-                    ditimpa.
-                  </p>
+                    <Download size={16} />
+                    Unduh Template
+                  </button>
                 </div>
               </div>
 
-              <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <p className="mt-1 text-sm text-slate-500">
+                Unggah file CSV untuk menambahkan atau memperbarui data pengguna secara massal.
+              </p>
+
+              <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-4">
+                <p className="text-sm font-medium text-slate-700">
+                  Format kolom (urutkan):
+                </p>
+                <code className="mt-2 block rounded bg-white px-3 py-2 text-xs text-slate-600 border border-slate-200">
+                  email, nama, jenis, email_atasan, admin, password
+                </code>
+              </div>
+
+              <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 py-12 text-center">
+                <Upload size={32} className="text-slate-400" />
+                <p className="mt-3 text-sm font-medium text-slate-700">
+                  {selectedFile ? selectedFile.name : "Belum ada file dipilih"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Maksimum 5MB, format .csv
+                </p>
+
+                <input
+                  ref={fileInputRef}
+                  id="csv-file"
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+
                 <button
                   type="button"
                   onClick={handleChooseFile}
-                  disabled={isImporting}
-                  className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  className="mt-6 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
                 >
-                  {selectedFile ? "Pilih file lain" : "Pilih file"}
+                  {selectedFile ? "Ganti File" : "Pilih File"}
                 </button>
+              </div>
 
+              <div className="mt-6 flex justify-end">
                 <button
                   type="button"
                   onClick={handleValidate}
