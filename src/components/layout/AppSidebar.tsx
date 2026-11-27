@@ -43,15 +43,15 @@ export function AppSidebar({ activeItem = "logbook" }: AppSidebarProps) {
   return (
     <>
       <aside
-        className="relative hidden w-52 shrink-0 border-r border-slate-200 bg-white md:block"
+        className="hidden w-52 shrink-0 border-r border-slate-200 bg-white md:block"
         aria-label="Navigasi utama"
       >
-        <div className="sticky top-0 flex min-h-screen flex-col p-5">
+        <div className="sticky top-0 flex h-screen flex-col p-5">
           <p className="px-2 text-2xl font-extrabold tracking-tight text-slate-950">
             Log Book
           </p>
 
-          <nav className="mt-8 flex-1 space-y-1 text-sm">
+          <nav className="mt-8 flex-1 space-y-1 overflow-y-auto scrollbar-hide text-sm">
             <p className="px-3 pb-2 text-xs font-semibold text-slate-400">
               LOG BOOK SAYA
             </p>
